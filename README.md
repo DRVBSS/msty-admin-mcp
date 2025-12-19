@@ -17,10 +17,11 @@ Msty Admin MCP bridges the gap between Claude Desktop and Msty Studio Desktop, e
 - **Health Monitoring**: Comprehensive system health analysis and recommendations
 - **Configuration Sync**: Export/import tools between Claude Desktop and Msty
 - **Hardware Optimization**: Apple Silicon-optimized model recommendations
+- **Tiered AI Workflow**: Local model calibration with Claude Opus handoff
 
 ## 🚀 Features
 
-### Phase 1: Foundational Tools (Current) ✅
+### Phase 1: Foundational Tools ✅
 
 | Tool | Description |
 |------|-------------|
@@ -36,6 +37,7 @@ Msty Admin MCP bridges the gap between Claude Desktop and Msty Studio Desktop, e
 - `export_tool_config` - Generate MCP tool JSON for sync
 - `generate_persona` - Create persona configurations
 - `sync_claude_preferences` - Convert Claude Desktop prefs to Msty format
+- `import_tool_config` - Import tool configurations into Msty
 
 ### Phase 3: Automation Bridge (Planned)
 
@@ -49,6 +51,54 @@ Msty Admin MCP bridges the gap between Claude Desktop and Msty Studio Desktop, e
 - `recommend_models_for_hardware` - Mac specs → optimal MLX models
 - `analyse_conversation_patterns` - Usage insights
 - `optimise_knowledge_stacks` - Performance recommendations
+- `suggest_persona_improvements` - AI-powered persona optimization
+
+### Phase 5: Local Model Calibration & Handoff (Planned)
+
+The ultimate goal: run local MLX models that perform at Claude Opus level for routine tasks, with seamless escalation to Claude when complexity demands it.
+
+```
+┌─────────────────────────────────────────────────┐
+│                 Task Incoming                    │
+└─────────────────────┬───────────────────────────┘
+                      │
+         ┌────────────┴────────────┐
+         ▼                         ▼
+┌─────────────────┐      ┌─────────────────┐
+│   Local MLX     │      │   Claude Opus   │
+│   (Routine)     │      │   (Complex)     │
+│                 │      │                 │
+│ • File ops      │      │ • Architecture  │
+│ • Simple code   │      │ • Deep analysis │
+│ • Status checks │      │ • Creative work │
+│ • Data queries  │      │ • Multi-step    │
+└────────┬────────┘      └────────┬────────┘
+         │                        │
+         └────────────┬───────────┘
+                      ▼
+┌─────────────────────────────────────────────────┐
+│              Shared MCP Ecosystem                │
+│  Memory • Trello • GitHub • Filesystem • More   │
+└─────────────────────────────────────────────────┘
+```
+
+**Calibration Protocol:**
+1. Test prompts sent to both local model AND Claude Opus (benchmark)
+2. Claude Opus evaluates local output against its own benchmark
+3. Scoring: Accuracy, Reasoning, Style, Tool Use, Safety
+4. Auto-tune recommendations applied to Msty persona
+5. Iterate until local model achieves "Opus approval"
+
+**Phase 5 Tools:**
+- `create_opus_persona` - Generate Msty persona with Universal Preferences
+- `sync_mcp_toolbox` - Mirror Claude Desktop MCP config to Msty
+- `run_calibration_suite` - Execute test prompts against local model
+- `evaluate_response_pair` - Opus compares local vs benchmark
+- `generate_tuning_recommendations` - Auto-suggest config adjustments
+- `apply_persona_adjustments` - Auto-update Msty persona
+- `prepare_handoff_context` - Package state for Claude escalation
+- `identify_handoff_triggers` - Learn which prompts need escalation
+- `track_calibration_history` - Monitor improvement over iterations
 
 ## 📦 Installation
 
@@ -90,18 +140,6 @@ Add to your `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Or using the installed script:
-
-```json
-{
-  "mcpServers": {
-    "msty-admin": {
-      "command": "/path/to/msty-admin-mcp/.venv/bin/msty-admin-mcp"
-    }
-  }
-}
-```
-
 ### Msty Studio Configuration
 
 Import the tool via Toolbox → Add New Tool → Import from JSON:
@@ -124,8 +162,6 @@ Once configured, ask Claude to use the Msty Admin tools:
 ```
 "Check if Msty Studio is installed and get its status"
 ```
-
-Claude will use `detect_msty_installation` to verify the setup.
 
 ### Database Insights
 
