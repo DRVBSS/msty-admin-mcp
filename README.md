@@ -466,13 +466,6 @@ Contributions welcome! Please:
 
 MIT License - see [LICENSE](LICENSE) for details.
 
----
-
-## Acknowledgements
-
-- [Msty Studio](https://msty.ai) - The excellent local AI application this MCP administers
-- [Anthropic](https://anthropic.com) - For Claude and the MCP protocol
-- [Model Context Protocol](https://modelcontextprotocol.io) - The foundation making this possible
 
 ---
 
