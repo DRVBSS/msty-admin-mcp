@@ -1,43 +1,51 @@
 #!/usr/bin/env python3
 """
-Msty Admin MCP Server v4.1.0
+Msty Admin MCP Server v6.0.0
 
 AI-administered Msty Studio Desktop management system with database insights,
 configuration management, hardware optimization, and Claude Desktop sync.
 
 Phase 1: Foundational Tools (Read-Only)
-- detect_msty_installation
-- read_msty_database
-- list_configured_tools
-- get_model_providers
-- analyse_msty_health
-- get_server_status
+- detect_msty_installation, read_msty_database, list_configured_tools
+- get_model_providers, analyse_msty_health, get_server_status
+- scan_database_locations
 
 Phase 2: Configuration Management
-- export_tool_config
-- sync_claude_preferences
-- generate_persona
-- import_tool_config
+- export_tool_config, sync_claude_preferences
+- generate_persona, import_tool_config
 
 Phase 3: Automation Bridge
-- query_local_ai_service
-- list_available_models
-- get_sidecar_status
-- chat_with_local_model
-- recommend_model
+- query_local_ai_service, list_available_models, get_sidecar_status
+- chat_with_local_model, recommend_model
+- list_model_tags, find_model_by_tag
+- get_cache_stats, clear_cache
 
 Phase 4: Intelligence Layer
-- get_model_performance_metrics
-- analyse_conversation_patterns
-- compare_model_responses
-- optimise_knowledge_stacks
+- get_model_performance_metrics, analyse_conversation_patterns
+- compare_model_responses, optimise_knowledge_stacks
 - suggest_persona_improvements
 
 Phase 5: Tiered AI Workflow
-- run_calibration_test
-- evaluate_response_quality
-- identify_handoff_triggers
-- get_calibration_history
+- run_calibration_test, evaluate_response_quality
+- identify_handoff_triggers, get_calibration_history
+
+Phase 6: Advanced Model Management
+- get_model_details, benchmark_model
+- list_local_model_files, estimate_model_requirements
+
+Phase 7: Conversation Management
+- export_conversations, search_conversations
+- get_conversation_stats
+
+Phase 8: Prompt Templates & Automation
+- create_prompt_template, list_prompt_templates
+- run_prompt_template, smart_model_router
+
+Phase 9: Backup & System Management
+- backup_configuration, restore_configuration
+- get_system_resources
+
+Total: 42 tools
 
 Created by Pineapple 🍍 AI Administration System
 """
@@ -86,7 +94,7 @@ mcp = FastMCP("msty-admin")
 # Constants
 # =============================================================================
 
-SERVER_VERSION = "5.2.0"
+SERVER_VERSION = "6.0.0"
 
 # Configurable via environment variables
 SIDECAR_HOST = os.environ.get("MSTY_SIDECAR_HOST", "127.0.0.1")
@@ -845,9 +853,12 @@ def get_server_status() -> str:
             "phase_3_cache": ["get_cache_stats", "clear_cache"],
             "phase_4_intelligence": ["get_model_performance_metrics", "analyse_conversation_patterns", "compare_model_responses", "optimise_knowledge_stacks", "suggest_persona_improvements"],
             "phase_5_calibration": ["run_calibration_test", "evaluate_response_quality", "identify_handoff_triggers", "get_calibration_history"],
-            "phase_6_model_management": ["get_model_details", "benchmark_model", "list_local_model_files", "estimate_model_requirements"]
+            "phase_6_model_management": ["get_model_details", "benchmark_model", "list_local_model_files", "estimate_model_requirements"],
+            "phase_7_conversations": ["export_conversations", "search_conversations", "get_conversation_stats"],
+            "phase_8_automation": ["create_prompt_template", "list_prompt_templates", "run_prompt_template", "smart_model_router"],
+            "phase_9_backup": ["backup_configuration", "restore_configuration", "get_system_resources"]
         },
-        "tool_count": 32,
+        "tool_count": 42,
         "msty_status": {
             "installed": paths.get("app") is not None or paths.get("app_alt") is not None,
             "database_available": paths.get("database") is not None,
@@ -2030,6 +2041,864 @@ def estimate_model_requirements(model_id: str) -> str:
 
 
 # =============================================================================
+# Phase 7: Conversation & Memory
+# =============================================================================
+
+@mcp.tool()
+def export_conversations(
+    output_format: str = "json",
+    days: Optional[int] = None,
+    model_filter: Optional[str] = None,
+    limit: int = 100
+) -> str:
+    """
+    Export chat history from Msty database.
+
+    Args:
+        output_format: Output format ("json", "markdown", "csv")
+        days: Only export conversations from last N days (None = all)
+        model_filter: Only export conversations using this model
+        limit: Maximum conversations to export (default: 100)
+
+    Returns:
+        Exported conversations in requested format
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "format": output_format,
+        "filters": {"days": days, "model": model_filter, "limit": limit},
+    }
+
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if not db_path:
+        result["error"] = "Msty database not found. Use scan_database_locations to find it."
+        result["suggestion"] = "Set MSTY_DATABASE_PATH environment variable"
+        return json.dumps(result, indent=2)
+
+    try:
+        # Query conversations
+        tables = get_table_names(db_path)
+        conv_table = None
+        for t in ["chat_sessions", "conversations", "sessions"]:
+            if t in tables:
+                conv_table = t
+                break
+
+        if not conv_table:
+            result["error"] = "No conversation table found in database"
+            result["available_tables"] = tables
+            return json.dumps(result, indent=2)
+
+        # Build query
+        query = f"SELECT * FROM {conv_table}"
+        params = []
+
+        if days:
+            cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+            query += " WHERE created_at > ? OR updated_at > ?"
+            params.extend([cutoff, cutoff])
+
+        query += f" ORDER BY rowid DESC LIMIT {limit}"
+
+        conversations = query_database(db_path, query, tuple(params) if params else ())
+
+        if model_filter:
+            conversations = [c for c in conversations if model_filter.lower() in str(c.get("model", "")).lower()]
+
+        result["conversation_count"] = len(conversations)
+
+        if output_format == "json":
+            result["conversations"] = conversations
+        elif output_format == "markdown":
+            md_lines = ["# Msty Conversations Export\n"]
+            for conv in conversations:
+                md_lines.append(f"## {conv.get('title', 'Untitled')}")
+                md_lines.append(f"- Model: {conv.get('model', 'Unknown')}")
+                md_lines.append(f"- Created: {conv.get('created_at', 'Unknown')}")
+                md_lines.append("")
+            result["markdown"] = "\n".join(md_lines)
+        elif output_format == "csv":
+            if conversations:
+                headers = list(conversations[0].keys())
+                csv_lines = [",".join(headers)]
+                for conv in conversations:
+                    csv_lines.append(",".join(str(conv.get(h, "")).replace(",", ";") for h in headers))
+                result["csv"] = "\n".join(csv_lines)
+
+    except Exception as e:
+        result["error"] = str(e)
+
+    return json.dumps(result, indent=2, default=str)
+
+
+@mcp.tool()
+def search_conversations(
+    query: str,
+    search_type: str = "keyword",
+    limit: int = 20
+) -> str:
+    """
+    Search through past conversations.
+
+    Args:
+        query: Search query (keyword or phrase)
+        search_type: "keyword" for text search, "title" for title-only search
+        limit: Maximum results to return
+
+    Returns:
+        Matching conversations with context
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "query": query,
+        "search_type": search_type,
+        "matches": []
+    }
+
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if not db_path:
+        result["error"] = "Msty database not found. Use scan_database_locations to find it."
+        return json.dumps(result, indent=2)
+
+    try:
+        tables = get_table_names(db_path)
+
+        # Search in conversations/sessions table
+        conv_table = None
+        for t in ["chat_sessions", "conversations", "sessions"]:
+            if t in tables:
+                conv_table = t
+                break
+
+        if conv_table:
+            if search_type == "title":
+                sql = f"SELECT * FROM {conv_table} WHERE title LIKE ? LIMIT ?"
+            else:
+                sql = f"SELECT * FROM {conv_table} WHERE title LIKE ? OR summary LIKE ? LIMIT ?"
+
+            search_pattern = f"%{query}%"
+
+            if search_type == "title":
+                matches = query_database(db_path, sql, (search_pattern, limit))
+            else:
+                matches = query_database(db_path, sql, (search_pattern, search_pattern, limit))
+
+            result["matches"] = matches
+
+        # Also search messages if available
+        msg_table = None
+        for t in ["messages", "chat_messages"]:
+            if t in tables:
+                msg_table = t
+                break
+
+        if msg_table:
+            msg_sql = f"SELECT * FROM {msg_table} WHERE content LIKE ? LIMIT ?"
+            msg_matches = query_database(db_path, msg_sql, (f"%{query}%", limit))
+            result["message_matches"] = len(msg_matches)
+            if msg_matches:
+                result["message_samples"] = msg_matches[:5]  # Return first 5 as samples
+
+        result["total_matches"] = len(result.get("matches", []))
+
+    except Exception as e:
+        result["error"] = str(e)
+
+    return json.dumps(result, indent=2, default=str)
+
+
+@mcp.tool()
+def get_conversation_stats(days: int = 30) -> str:
+    """
+    Get usage analytics for conversations.
+
+    Args:
+        days: Number of days to analyze (default: 30)
+
+    Returns:
+        Statistics including messages per day, model usage, session lengths
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "period_days": days,
+        "stats": {}
+    }
+
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if not db_path:
+        result["error"] = "Msty database not found. Use scan_database_locations to find it."
+        return json.dumps(result, indent=2)
+
+    try:
+        tables = get_table_names(db_path)
+
+        # Get conversation counts
+        conv_table = None
+        for t in ["chat_sessions", "conversations", "sessions"]:
+            if t in tables:
+                conv_table = t
+                break
+
+        if conv_table:
+            total = query_database(db_path, f"SELECT COUNT(*) as count FROM {conv_table}")
+            result["stats"]["total_conversations"] = total[0]["count"] if total else 0
+
+            # Recent conversations
+            cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+            recent = query_database(
+                db_path,
+                f"SELECT COUNT(*) as count FROM {conv_table} WHERE created_at > ?",
+                (cutoff,)
+            )
+            result["stats"]["recent_conversations"] = recent[0]["count"] if recent else 0
+
+            # Model usage
+            model_usage = query_database(
+                db_path,
+                f"SELECT model, COUNT(*) as count FROM {conv_table} GROUP BY model ORDER BY count DESC LIMIT 10"
+            )
+            result["stats"]["model_usage"] = model_usage
+
+        # Get message counts
+        msg_table = None
+        for t in ["messages", "chat_messages"]:
+            if t in tables:
+                msg_table = t
+                break
+
+        if msg_table:
+            total_msgs = query_database(db_path, f"SELECT COUNT(*) as count FROM {msg_table}")
+            result["stats"]["total_messages"] = total_msgs[0]["count"] if total_msgs else 0
+
+            # Messages by role
+            role_counts = query_database(
+                db_path,
+                f"SELECT role, COUNT(*) as count FROM {msg_table} GROUP BY role"
+            )
+            result["stats"]["messages_by_role"] = {r["role"]: r["count"] for r in role_counts}
+
+        # Calculate averages
+        if result["stats"].get("total_conversations", 0) > 0 and result["stats"].get("total_messages", 0) > 0:
+            result["stats"]["avg_messages_per_conversation"] = round(
+                result["stats"]["total_messages"] / result["stats"]["total_conversations"], 1
+            )
+
+        # Personas if available
+        if "personas" in tables:
+            personas = query_database(db_path, "SELECT COUNT(*) as count FROM personas")
+            result["stats"]["total_personas"] = personas[0]["count"] if personas else 0
+
+    except Exception as e:
+        result["error"] = str(e)
+
+    return json.dumps(result, indent=2, default=str)
+
+
+# =============================================================================
+# Phase 8: Automation & Task Templates
+# =============================================================================
+
+@mcp.tool()
+def create_prompt_template(
+    name: str,
+    template: str,
+    description: str = "",
+    variables: Optional[List[str]] = None,
+    preferred_model: Optional[str] = None,
+    category: str = "general"
+) -> str:
+    """
+    Create a reusable prompt template with variables.
+
+    Args:
+        name: Template name (unique identifier)
+        template: Prompt template with {{variable}} placeholders
+        description: What this template is for
+        variables: List of variable names used in template
+        preferred_model: Recommended model for this template
+        category: Category (general, coding, writing, analysis, creative)
+
+    Returns:
+        Created template configuration
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "action": "create",
+        "template": {}
+    }
+
+    # Extract variables from template if not provided
+    import re
+    if variables is None:
+        variables = re.findall(r'\{\{(\w+)\}\}', template)
+
+    template_config = {
+        "name": name,
+        "description": description,
+        "template": template,
+        "variables": variables,
+        "preferred_model": preferred_model,
+        "category": category,
+        "created_at": datetime.now().isoformat()
+    }
+
+    # Store in metrics database
+    try:
+        init_metrics_db()
+        db_path = get_metrics_db_path()
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+
+        # Create templates table if not exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS prompt_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                description TEXT,
+                template TEXT NOT NULL,
+                variables TEXT,
+                preferred_model TEXT,
+                category TEXT DEFAULT 'general',
+                created_at TEXT,
+                use_count INTEGER DEFAULT 0
+            )
+        """)
+
+        cursor.execute("""
+            INSERT OR REPLACE INTO prompt_templates
+            (name, description, template, variables, preferred_model, category, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            name,
+            description,
+            template,
+            json.dumps(variables),
+            preferred_model,
+            category,
+            template_config["created_at"]
+        ))
+        conn.commit()
+        conn.close()
+
+        result["template"] = template_config
+        result["status"] = "created"
+
+    except Exception as e:
+        result["error"] = str(e)
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def list_prompt_templates(category: Optional[str] = None) -> str:
+    """
+    List all saved prompt templates.
+
+    Args:
+        category: Filter by category (optional)
+
+    Returns:
+        List of templates with usage stats
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "templates": []
+    }
+
+    try:
+        init_metrics_db()
+        db_path = get_metrics_db_path()
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        if category:
+            cursor.execute("SELECT * FROM prompt_templates WHERE category = ? ORDER BY use_count DESC", (category,))
+        else:
+            cursor.execute("SELECT * FROM prompt_templates ORDER BY use_count DESC")
+
+        templates = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        # Parse variables back to list
+        for t in templates:
+            if t.get("variables"):
+                t["variables"] = json.loads(t["variables"])
+
+        result["templates"] = templates
+        result["count"] = len(templates)
+
+    except sqlite3.OperationalError:
+        result["templates"] = []
+        result["note"] = "No templates created yet"
+    except Exception as e:
+        result["error"] = str(e)
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def run_prompt_template(
+    template_name: str,
+    variables: Dict[str, str],
+    model: Optional[str] = None
+) -> str:
+    """
+    Execute a saved prompt template with provided variables.
+
+    Args:
+        template_name: Name of the template to run
+        variables: Dictionary of variable values to substitute
+        model: Override model (uses template's preferred_model if not specified)
+
+    Returns:
+        Model response from executing the template
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "template_name": template_name,
+    }
+
+    try:
+        init_metrics_db()
+        db_path = get_metrics_db_path()
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM prompt_templates WHERE name = ?", (template_name,))
+        row = cursor.fetchone()
+
+        if not row:
+            result["error"] = f"Template '{template_name}' not found"
+            conn.close()
+            return json.dumps(result, indent=2)
+
+        template = dict(row)
+        template_text = template["template"]
+
+        # Substitute variables
+        for var_name, var_value in variables.items():
+            template_text = template_text.replace(f"{{{{{var_name}}}}}", str(var_value))
+
+        # Check for missing variables
+        import re
+        missing = re.findall(r'\{\{(\w+)\}\}', template_text)
+        if missing:
+            result["error"] = f"Missing variables: {missing}"
+            conn.close()
+            return json.dumps(result, indent=2)
+
+        result["rendered_prompt"] = template_text[:500] + "..." if len(template_text) > 500 else template_text
+
+        # Use specified model or template's preferred model
+        use_model = model or template.get("preferred_model")
+
+        # Update use count
+        cursor.execute("UPDATE prompt_templates SET use_count = use_count + 1 WHERE name = ?", (template_name,))
+        conn.commit()
+        conn.close()
+
+        # Execute with chat_with_local_model
+        chat_result = chat_with_local_model(
+            message=template_text,
+            model=use_model
+        )
+        chat_data = json.loads(chat_result)
+
+        result["model_used"] = chat_data.get("request", {}).get("model")
+        result["response"] = chat_data.get("response", {}).get("content")
+        result["timing"] = chat_data.get("timing")
+
+    except Exception as e:
+        result["error"] = str(e)
+
+    return json.dumps(result, indent=2, default=str)
+
+
+@mcp.tool()
+def smart_model_router(
+    task_description: str,
+    prefer_speed: bool = False,
+    prefer_quality: bool = False
+) -> str:
+    """
+    Automatically select the best model for a given task.
+
+    Args:
+        task_description: Description of what you want to accomplish
+        prefer_speed: Prioritize faster models
+        prefer_quality: Prioritize higher quality models
+
+    Returns:
+        Recommended model with reasoning
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "task": task_description[:200],
+        "preferences": {"speed": prefer_speed, "quality": prefer_quality}
+    }
+
+    # Analyze task to determine category
+    task_lower = task_description.lower()
+
+    detected_category = "general"
+    if any(word in task_lower for word in ["code", "program", "function", "debug", "script", "api"]):
+        detected_category = "coding"
+    elif any(word in task_lower for word in ["write", "essay", "story", "email", "blog", "article"]):
+        detected_category = "writing"
+    elif any(word in task_lower for word in ["analyze", "compare", "evaluate", "research", "study"]):
+        detected_category = "analysis"
+    elif any(word in task_lower for word in ["think", "reason", "solve", "math", "logic", "puzzle"]):
+        detected_category = "reasoning"
+    elif any(word in task_lower for word in ["creative", "brainstorm", "idea", "imagine"]):
+        detected_category = "creative"
+
+    result["detected_category"] = detected_category
+
+    # Map category to preferred tags
+    tag_priority = {
+        "coding": ["coding", "quality"],
+        "writing": ["creative", "quality"],
+        "analysis": ["reasoning", "quality"],
+        "reasoning": ["reasoning", "quality"],
+        "creative": ["creative"],
+        "general": ["general"]
+    }
+
+    tags_to_find = tag_priority.get(detected_category, ["general"])
+
+    if prefer_speed:
+        tags_to_find = ["fast"] + tags_to_find
+    if prefer_quality:
+        tags_to_find = ["quality"] + tags_to_find
+
+    result["search_tags"] = tags_to_find
+
+    # Find matching models
+    best_model = None
+    best_score = 0
+
+    services = get_available_service_ports()
+    candidates = []
+
+    for service_name, service_info in services.items():
+        if service_info["available"]:
+            response = make_api_request("/v1/models", port=service_info["port"])
+            if response.get("success"):
+                data = response.get("data", {})
+                if isinstance(data, dict) and "data" in data:
+                    for m in data["data"]:
+                        model_id = m.get("id", "")
+                        # Skip embedding models
+                        if any(x in model_id.lower() for x in ["embed", "bge", "nomic"]):
+                            continue
+
+                        tags = get_model_tags(model_id)
+                        score = sum(1 for t in tags_to_find if t in tags)
+
+                        if score > 0:
+                            candidates.append({
+                                "model_id": model_id,
+                                "service": service_name,
+                                "port": service_info["port"],
+                                "tags": tags,
+                                "score": score
+                            })
+
+    # Sort by score
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+
+    if candidates:
+        result["recommended"] = candidates[0]
+        result["alternatives"] = candidates[1:4]  # Top 3 alternatives
+        result["reasoning"] = f"Selected based on tags matching: {tags_to_find}"
+    else:
+        # Fallback to first available chat model
+        model, port = get_first_chat_model()
+        if model:
+            result["recommended"] = {"model_id": model, "port": port, "tags": get_model_tags(model)}
+            result["reasoning"] = "Fallback to first available chat model"
+        else:
+            result["error"] = "No suitable models found"
+
+    return json.dumps(result, indent=2)
+
+
+# =============================================================================
+# Phase 9: Backup & Integration
+# =============================================================================
+
+@mcp.tool()
+def backup_configuration(
+    output_path: Optional[str] = None,
+    include_personas: bool = True,
+    include_prompts: bool = True,
+    include_templates: bool = True,
+    include_tools: bool = True
+) -> str:
+    """
+    Create a comprehensive backup of Msty configuration.
+
+    Args:
+        output_path: Path to save backup file (optional, returns JSON if not specified)
+        include_personas: Include persona configurations
+        include_prompts: Include saved prompts
+        include_templates: Include prompt templates
+        include_tools: Include MCP tool configurations
+
+    Returns:
+        Backup data or confirmation of saved file
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "backup": {
+            "version": SERVER_VERSION,
+            "created_at": datetime.now().isoformat(),
+        }
+    }
+
+    backup_data = {
+        "metadata": {
+            "version": SERVER_VERSION,
+            "created_at": datetime.now().isoformat(),
+            "source": "msty-admin-mcp"
+        }
+    }
+
+    # Get Msty database data
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if db_path:
+        tables = get_table_names(db_path)
+
+        if include_personas and "personas" in tables:
+            backup_data["personas"] = query_database(db_path, "SELECT * FROM personas")
+
+        if include_prompts:
+            for t in ["prompts", "prompt_library"]:
+                if t in tables:
+                    backup_data["prompts"] = query_database(db_path, f"SELECT * FROM {t}")
+                    break
+
+        if include_tools:
+            for t in ["tools", "mcp_tools"]:
+                if t in tables:
+                    backup_data["tools"] = query_database(db_path, f"SELECT * FROM {t}")
+                    break
+
+    # Get prompt templates from our metrics DB
+    if include_templates:
+        try:
+            init_metrics_db()
+            metrics_db = get_metrics_db_path()
+            conn = sqlite3.connect(str(metrics_db))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM prompt_templates")
+            backup_data["prompt_templates"] = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+        except:
+            backup_data["prompt_templates"] = []
+
+    # Get Claude Desktop config
+    if include_tools:
+        claude_config = read_claude_desktop_config()
+        if "error" not in claude_config:
+            backup_data["claude_desktop_mcp"] = claude_config.get("mcpServers", {})
+
+    result["backup"]["sections"] = list(backup_data.keys())
+    result["backup"]["item_counts"] = {k: len(v) if isinstance(v, list) else 1 for k, v in backup_data.items()}
+
+    if output_path:
+        try:
+            expanded_path = expand_path(output_path)
+            Path(expanded_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(expanded_path, 'w') as f:
+                json.dump(backup_data, f, indent=2, default=str)
+            result["saved_to"] = output_path
+            result["status"] = "Backup saved successfully"
+        except Exception as e:
+            result["error"] = f"Failed to save backup: {e}"
+            result["backup_data"] = backup_data
+    else:
+        result["backup_data"] = backup_data
+
+    return json.dumps(result, indent=2, default=str)
+
+
+@mcp.tool()
+def restore_configuration(
+    backup_path: Optional[str] = None,
+    backup_json: Optional[str] = None,
+    restore_templates: bool = True,
+    dry_run: bool = True
+) -> str:
+    """
+    Restore configuration from a backup.
+
+    Args:
+        backup_path: Path to backup file
+        backup_json: Backup data as JSON string (alternative to file)
+        restore_templates: Restore prompt templates
+        dry_run: If True, only validate without restoring (default: True)
+
+    Returns:
+        Restore status and what would be/was restored
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "dry_run": dry_run,
+        "restore_plan": []
+    }
+
+    # Load backup data
+    backup_data = None
+
+    if backup_path:
+        try:
+            with open(expand_path(backup_path), 'r') as f:
+                backup_data = json.load(f)
+        except Exception as e:
+            result["error"] = f"Failed to load backup: {e}"
+            return json.dumps(result, indent=2)
+    elif backup_json:
+        try:
+            backup_data = json.loads(backup_json)
+        except json.JSONDecodeError as e:
+            result["error"] = f"Invalid JSON: {e}"
+            return json.dumps(result, indent=2)
+    else:
+        result["error"] = "Provide either backup_path or backup_json"
+        return json.dumps(result, indent=2)
+
+    result["backup_metadata"] = backup_data.get("metadata", {})
+
+    # Plan restoration
+    if restore_templates and "prompt_templates" in backup_data:
+        templates = backup_data["prompt_templates"]
+        result["restore_plan"].append({
+            "type": "prompt_templates",
+            "count": len(templates),
+            "items": [t.get("name") for t in templates]
+        })
+
+        if not dry_run:
+            try:
+                init_metrics_db()
+                db_path = get_metrics_db_path()
+                conn = sqlite3.connect(str(db_path))
+                cursor = conn.cursor()
+
+                for t in templates:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO prompt_templates
+                        (name, description, template, variables, preferred_model, category, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        t.get("name"),
+                        t.get("description"),
+                        t.get("template"),
+                        t.get("variables") if isinstance(t.get("variables"), str) else json.dumps(t.get("variables", [])),
+                        t.get("preferred_model"),
+                        t.get("category", "general"),
+                        t.get("created_at", datetime.now().isoformat())
+                    ))
+                conn.commit()
+                conn.close()
+                result["restored"] = {"prompt_templates": len(templates)}
+            except Exception as e:
+                result["error"] = f"Failed to restore templates: {e}"
+
+    if dry_run:
+        result["status"] = "Dry run complete - no changes made"
+        result["note"] = "Set dry_run=False to actually restore"
+    else:
+        result["status"] = "Restore complete"
+
+    return json.dumps(result, indent=2, default=str)
+
+
+@mcp.tool()
+def get_system_resources() -> str:
+    """
+    Get current system resource usage.
+
+    Returns:
+        CPU, memory, and disk usage information relevant to AI model inference
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "system": {},
+        "memory": {},
+        "disk": {},
+        "recommendations": []
+    }
+
+    # CPU info
+    result["system"]["cpu_count"] = psutil.cpu_count()
+    result["system"]["cpu_percent"] = psutil.cpu_percent(interval=0.5)
+
+    # Memory info
+    mem = psutil.virtual_memory()
+    result["memory"]["total_gb"] = round(mem.total / (1024 ** 3), 1)
+    result["memory"]["available_gb"] = round(mem.available / (1024 ** 3), 1)
+    result["memory"]["used_gb"] = round(mem.used / (1024 ** 3), 1)
+    result["memory"]["percent_used"] = mem.percent
+
+    # Disk info (for model storage)
+    paths = get_msty_paths()
+    data_path = paths.get("data") or str(Path.home())
+
+    try:
+        disk = psutil.disk_usage(data_path)
+        result["disk"]["total_gb"] = round(disk.total / (1024 ** 3), 1)
+        result["disk"]["free_gb"] = round(disk.free / (1024 ** 3), 1)
+        result["disk"]["used_gb"] = round(disk.used / (1024 ** 3), 1)
+        result["disk"]["percent_used"] = round(disk.percent, 1)
+    except:
+        pass
+
+    # Recommendations based on resources
+    if mem.percent > 90:
+        result["recommendations"].append("⚠️ Memory usage is very high - consider closing other applications")
+    elif mem.percent > 75:
+        result["recommendations"].append("💡 Memory usage is elevated - larger models may run slowly")
+
+    if result["memory"]["available_gb"] < 8:
+        result["recommendations"].append("⚠️ Less than 8GB RAM available - stick to smaller models (7B or less)")
+    elif result["memory"]["available_gb"] < 16:
+        result["recommendations"].append("💡 16-32B models should work well")
+    else:
+        result["recommendations"].append("✅ Plenty of RAM available for large models")
+
+    if result.get("disk", {}).get("free_gb", 0) < 50:
+        result["recommendations"].append("⚠️ Low disk space - may affect model downloads")
+
+    # Check if Msty is using significant resources
+    for proc in psutil.process_iter(['name', 'memory_percent', 'cpu_percent']):
+        try:
+            if 'msty' in proc.info['name'].lower():
+                result["msty_process"] = {
+                    "name": proc.info['name'],
+                    "memory_percent": round(proc.info['memory_percent'], 1),
+                    "cpu_percent": round(proc.info['cpu_percent'], 1)
+                }
+                break
+        except:
+            pass
+
+    return json.dumps(result, indent=2)
+
+
+# =============================================================================
 # Phase 4: Intelligence Layer
 # =============================================================================
 
@@ -2554,6 +3423,871 @@ def get_calibration_history(
 
 
 # =============================================================================
+# Phase 7: Conversation Management
+# =============================================================================
+
+@mcp.tool()
+def export_conversations(
+    format: str = "json",
+    days: Optional[int] = None,
+    include_messages: bool = True,
+    output_path: Optional[str] = None
+) -> str:
+    """
+    Export conversations from Msty database.
+
+    Args:
+        format: Export format ("json", "markdown", "csv")
+        days: Only export conversations from last N days (None = all)
+        include_messages: Include full message content (default: True)
+        output_path: Optional path to save export file
+
+    Returns:
+        Export data or path to exported file
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "format": format,
+        "include_messages": include_messages,
+    }
+
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if not db_path or not Path(db_path).exists():
+        result["error"] = "Database not found"
+        result["suggestion"] = "Use scan_database_locations to find your database"
+        return json.dumps(result, indent=2)
+
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Get conversations
+        query = "SELECT * FROM chats ORDER BY created_at DESC"
+        if days:
+            from datetime import timedelta
+            cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+            query = f"SELECT * FROM chats WHERE created_at > '{cutoff}' ORDER BY created_at DESC"
+
+        cursor.execute(query)
+        conversations = [dict(row) for row in cursor.fetchall()]
+
+        if include_messages:
+            for conv in conversations:
+                conv_id = conv.get("id")
+                if conv_id:
+                    cursor.execute(
+                        "SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at",
+                        (conv_id,)
+                    )
+                    conv["messages"] = [dict(row) for row in cursor.fetchall()]
+
+        conn.close()
+
+        result["conversation_count"] = len(conversations)
+        result["conversations"] = conversations
+
+        # Format output
+        if format == "markdown":
+            md_output = "# Msty Conversations Export\n\n"
+            for conv in conversations:
+                md_output += f"## {conv.get('title', 'Untitled')}\n"
+                md_output += f"Created: {conv.get('created_at', 'Unknown')}\n\n"
+                if include_messages and conv.get("messages"):
+                    for msg in conv["messages"]:
+                        role = msg.get("role", "unknown").upper()
+                        content = msg.get("content", "")
+                        md_output += f"**{role}**: {content}\n\n"
+                md_output += "---\n\n"
+            result["markdown_output"] = md_output
+
+        if output_path:
+            output_file = Path(output_path)
+            if format == "json":
+                with open(output_file, "w") as f:
+                    json.dump(conversations, f, indent=2, default=str)
+            elif format == "markdown":
+                with open(output_file, "w") as f:
+                    f.write(result.get("markdown_output", ""))
+            elif format == "csv":
+                import csv
+                with open(output_file, "w", newline="") as f:
+                    if conversations:
+                        writer = csv.DictWriter(f, fieldnames=conversations[0].keys())
+                        writer.writeheader()
+                        writer.writerows([{k: v for k, v in c.items() if k != "messages"} for c in conversations])
+            result["output_file"] = str(output_file)
+            result["file_saved"] = True
+
+    except sqlite3.Error as e:
+        result["error"] = f"Database error: {str(e)}"
+    except Exception as e:
+        result["error"] = f"Export error: {str(e)}"
+
+    return json.dumps(result, indent=2, default=str)
+
+
+@mcp.tool()
+def search_conversations(
+    query: str,
+    search_messages: bool = True,
+    search_titles: bool = True,
+    limit: int = 20
+) -> str:
+    """
+    Search through conversations and messages.
+
+    Args:
+        query: Search query string
+        search_messages: Search in message content (default: True)
+        search_titles: Search in conversation titles (default: True)
+        limit: Maximum results to return (default: 20)
+
+    Returns:
+        Matching conversations with context
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "query": query,
+        "matches": [],
+    }
+
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if not db_path or not Path(db_path).exists():
+        result["error"] = "Database not found"
+        return json.dumps(result, indent=2)
+
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        matches = []
+        search_term = f"%{query}%"
+
+        if search_titles:
+            cursor.execute(
+                "SELECT id, title, created_at, updated_at FROM chats WHERE title LIKE ? LIMIT ?",
+                (search_term, limit)
+            )
+            for row in cursor.fetchall():
+                matches.append({
+                    "type": "title_match",
+                    "conversation_id": row["id"],
+                    "title": row["title"],
+                    "created_at": row["created_at"],
+                    "match_context": row["title"]
+                })
+
+        if search_messages:
+            cursor.execute(
+                """
+                SELECT m.id, m.chat_id, m.role, m.content, m.created_at, c.title
+                FROM messages m
+                LEFT JOIN chats c ON m.chat_id = c.id
+                WHERE m.content LIKE ?
+                LIMIT ?
+                """,
+                (search_term, limit)
+            )
+            for row in cursor.fetchall():
+                content = row["content"] or ""
+                # Extract context around the match
+                lower_content = content.lower()
+                query_lower = query.lower()
+                pos = lower_content.find(query_lower)
+                if pos >= 0:
+                    start = max(0, pos - 50)
+                    end = min(len(content), pos + len(query) + 50)
+                    context = ("..." if start > 0 else "") + content[start:end] + ("..." if end < len(content) else "")
+                else:
+                    context = content[:100] + "..." if len(content) > 100 else content
+
+                matches.append({
+                    "type": "message_match",
+                    "conversation_id": row["chat_id"],
+                    "conversation_title": row["title"],
+                    "message_role": row["role"],
+                    "created_at": row["created_at"],
+                    "match_context": context
+                })
+
+        conn.close()
+
+        result["matches"] = matches[:limit]
+        result["match_count"] = len(matches)
+        result["limited_to"] = limit if len(matches) >= limit else None
+
+    except sqlite3.Error as e:
+        result["error"] = f"Database error: {str(e)}"
+
+    return json.dumps(result, indent=2, default=str)
+
+
+@mcp.tool()
+def get_conversation_stats(days: int = 30) -> str:
+    """
+    Get conversation statistics and usage patterns.
+
+    Args:
+        days: Number of days to analyze (default: 30)
+
+    Returns:
+        Statistics including message counts, activity patterns, model usage
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "period_days": days,
+        "statistics": {},
+    }
+
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if not db_path or not Path(db_path).exists():
+        result["error"] = "Database not found"
+        return json.dumps(result, indent=2)
+
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        from datetime import timedelta
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+
+        # Total conversations
+        cursor.execute("SELECT COUNT(*) FROM chats WHERE created_at > ?", (cutoff,))
+        total_convs = cursor.fetchone()[0]
+
+        # Total messages
+        cursor.execute(
+            "SELECT COUNT(*) FROM messages WHERE created_at > ?",
+            (cutoff,)
+        )
+        total_msgs = cursor.fetchone()[0]
+
+        # Messages by role
+        cursor.execute(
+            """
+            SELECT role, COUNT(*) as count
+            FROM messages
+            WHERE created_at > ?
+            GROUP BY role
+            """,
+            (cutoff,)
+        )
+        msgs_by_role = {row["role"]: row["count"] for row in cursor.fetchall()}
+
+        # Average messages per conversation
+        avg_msgs = total_msgs / total_convs if total_convs > 0 else 0
+
+        # Activity by day of week
+        cursor.execute(
+            """
+            SELECT strftime('%w', created_at) as day, COUNT(*) as count
+            FROM messages
+            WHERE created_at > ?
+            GROUP BY day
+            ORDER BY day
+            """,
+            (cutoff,)
+        )
+        days_map = {0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat"}
+        activity_by_day = {days_map.get(int(row["day"]), row["day"]): row["count"] for row in cursor.fetchall()}
+
+        # Recent conversations
+        cursor.execute(
+            """
+            SELECT id, title, created_at
+            FROM chats
+            WHERE created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 10
+            """,
+            (cutoff,)
+        )
+        recent_convs = [dict(row) for row in cursor.fetchall()]
+
+        conn.close()
+
+        result["statistics"] = {
+            "total_conversations": total_convs,
+            "total_messages": total_msgs,
+            "messages_by_role": msgs_by_role,
+            "average_messages_per_conversation": round(avg_msgs, 1),
+            "activity_by_day_of_week": activity_by_day,
+            "recent_conversations": recent_convs,
+        }
+
+    except sqlite3.Error as e:
+        result["error"] = f"Database error: {str(e)}"
+
+    return json.dumps(result, indent=2, default=str)
+
+
+# =============================================================================
+# Phase 8: Prompt Templates & Automation
+# =============================================================================
+
+# In-memory prompt template storage
+_prompt_templates: Dict[str, Dict[str, Any]] = {}
+
+@mcp.tool()
+def create_prompt_template(
+    name: str,
+    template: str,
+    description: str = "",
+    variables: Optional[List[str]] = None,
+    category: str = "general"
+) -> str:
+    """
+    Create a reusable prompt template.
+
+    Args:
+        name: Unique template name
+        template: Template string with {{variable}} placeholders
+        description: Optional description of the template
+        variables: List of variable names (auto-detected if not provided)
+        category: Template category for organization
+
+    Returns:
+        Created template details
+    """
+    import re
+
+    # Auto-detect variables if not provided
+    if variables is None:
+        variables = list(set(re.findall(r'\{\{(\w+)\}\}', template)))
+
+    template_data = {
+        "name": name,
+        "template": template,
+        "description": description,
+        "variables": variables,
+        "category": category,
+        "created_at": datetime.now().isoformat(),
+        "usage_count": 0
+    }
+
+    _prompt_templates[name] = template_data
+
+    return json.dumps({
+        "timestamp": datetime.now().isoformat(),
+        "status": "Template created successfully",
+        "template": template_data
+    }, indent=2)
+
+
+@mcp.tool()
+def list_prompt_templates(category: Optional[str] = None) -> str:
+    """
+    List all available prompt templates.
+
+    Args:
+        category: Filter by category (optional)
+
+    Returns:
+        List of templates with their details
+    """
+    templates = list(_prompt_templates.values())
+
+    if category:
+        templates = [t for t in templates if t.get("category") == category]
+
+    # Add some built-in templates if none exist
+    if not _prompt_templates:
+        built_in = [
+            {
+                "name": "code_review",
+                "template": "Review this {{language}} code for bugs, security issues, and improvements:\n\n```{{language}}\n{{code}}\n```",
+                "description": "Code review template",
+                "variables": ["language", "code"],
+                "category": "coding",
+                "built_in": True
+            },
+            {
+                "name": "summarize",
+                "template": "Summarize the following {{content_type}} in {{length}} words or less:\n\n{{content}}",
+                "description": "Content summarization template",
+                "variables": ["content_type", "length", "content"],
+                "category": "writing",
+                "built_in": True
+            },
+            {
+                "name": "explain",
+                "template": "Explain {{topic}} to someone with {{expertise_level}} expertise in {{field}}.",
+                "description": "Explanation template",
+                "variables": ["topic", "expertise_level", "field"],
+                "category": "general",
+                "built_in": True
+            }
+        ]
+        templates.extend(built_in)
+
+    return json.dumps({
+        "timestamp": datetime.now().isoformat(),
+        "template_count": len(templates),
+        "templates": templates,
+        "categories": list(set(t.get("category", "general") for t in templates))
+    }, indent=2)
+
+
+@mcp.tool()
+def run_prompt_template(
+    template_name: str,
+    variables: Dict[str, str],
+    model_id: Optional[str] = None
+) -> str:
+    """
+    Run a prompt template with provided variables.
+
+    Args:
+        template_name: Name of the template to use
+        variables: Dictionary of variable values
+        model_id: Model to use (optional, uses first available if not specified)
+
+    Returns:
+        Generated response from the model
+    """
+    import re
+
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "template_name": template_name,
+    }
+
+    # Find template
+    template_data = _prompt_templates.get(template_name)
+
+    # Check built-in templates
+    if not template_data:
+        built_ins = {
+            "code_review": "Review this {{language}} code for bugs, security issues, and improvements:\n\n```{{language}}\n{{code}}\n```",
+            "summarize": "Summarize the following {{content_type}} in {{length}} words or less:\n\n{{content}}",
+            "explain": "Explain {{topic}} to someone with {{expertise_level}} expertise in {{field}}."
+        }
+        if template_name in built_ins:
+            template_data = {"template": built_ins[template_name], "variables": list(re.findall(r'\{\{(\w+)\}\}', built_ins[template_name]))}
+
+    if not template_data:
+        result["error"] = f"Template '{template_name}' not found"
+        result["available_templates"] = list(_prompt_templates.keys()) + ["code_review", "summarize", "explain"]
+        return json.dumps(result, indent=2)
+
+    # Substitute variables
+    prompt = template_data["template"]
+    for var_name, var_value in variables.items():
+        prompt = prompt.replace(f"{{{{{var_name}}}}}", str(var_value))
+
+    # Check for missing variables
+    missing = re.findall(r'\{\{(\w+)\}\}', prompt)
+    if missing:
+        result["error"] = f"Missing variables: {missing}"
+        result["required_variables"] = template_data.get("variables", [])
+        return json.dumps(result, indent=2)
+
+    result["generated_prompt"] = prompt
+
+    # Get model
+    if not model_id:
+        model_id, _ = get_first_chat_model()
+        if not model_id:
+            result["error"] = "No chat model available"
+            return json.dumps(result, indent=2)
+
+    result["model_id"] = model_id
+
+    # Run the prompt
+    port = get_chat_port_for_model(model_id)
+    start_time = time.time()
+
+    response = make_api_request(
+        "/v1/chat/completions",
+        port=port,
+        method="POST",
+        data={
+            "model": model_id,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 1024
+        },
+        timeout=60
+    )
+
+    elapsed = time.time() - start_time
+
+    if response.get("success"):
+        data = response.get("data", {})
+        choices = data.get("choices", [])
+        if choices:
+            result["response"] = choices[0].get("message", {}).get("content", "")
+            result["usage"] = data.get("usage", {})
+            result["latency_seconds"] = round(elapsed, 2)
+
+            # Update usage count
+            if template_name in _prompt_templates:
+                _prompt_templates[template_name]["usage_count"] += 1
+    else:
+        result["error"] = response.get("error")
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def smart_model_router(
+    task_description: str,
+    prefer_speed: bool = False,
+    prefer_quality: bool = False
+) -> str:
+    """
+    Intelligently select the best model for a task.
+
+    Args:
+        task_description: Description of the task to perform
+        prefer_speed: Prefer faster models over quality
+        prefer_quality: Prefer quality over speed
+
+    Returns:
+        Recommended model with reasoning
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "task_description": task_description,
+        "preferences": {
+            "speed": prefer_speed,
+            "quality": prefer_quality
+        }
+    }
+
+    # Analyze task to determine required capabilities
+    task_lower = task_description.lower()
+    required_tags = []
+
+    # Detect task type
+    if any(word in task_lower for word in ["code", "program", "function", "bug", "debug", "script"]):
+        required_tags.append("coding")
+    if any(word in task_lower for word in ["reason", "logic", "analyze", "think", "problem", "solve"]):
+        required_tags.append("reasoning")
+    if any(word in task_lower for word in ["write", "story", "creative", "poem", "article"]):
+        required_tags.append("creative")
+    if any(word in task_lower for word in ["quick", "fast", "simple", "brief", "short"]):
+        required_tags.append("fast")
+    if any(word in task_lower for word in ["complex", "detailed", "thorough", "comprehensive"]):
+        required_tags.append("quality")
+
+    # Apply preferences
+    if prefer_speed and "fast" not in required_tags:
+        required_tags.append("fast")
+    if prefer_quality and "quality" not in required_tags:
+        required_tags.append("quality")
+
+    result["detected_requirements"] = required_tags
+
+    # Get available models
+    services = get_available_service_ports()
+    available_models = []
+
+    for service_name, service_info in services.items():
+        if service_info["available"]:
+            response = make_api_request("/v1/models", port=service_info["port"])
+            if response.get("success"):
+                data = response.get("data", {})
+                if isinstance(data, dict) and "data" in data:
+                    for model in data["data"]:
+                        model_id = model.get("id", "")
+                        # Skip embedding models
+                        if not any(x in model_id.lower() for x in ["embed", "bge", "nomic"]):
+                            tags = get_model_tags(model_id)
+                            score = sum(1 for tag in required_tags if tag in tags)
+                            available_models.append({
+                                "model_id": model_id,
+                                "service": service_name,
+                                "port": service_info["port"],
+                                "tags": tags,
+                                "match_score": score
+                            })
+
+    if not available_models:
+        result["error"] = "No chat models available"
+        return json.dumps(result, indent=2)
+
+    # Sort by match score
+    available_models.sort(key=lambda x: x["match_score"], reverse=True)
+
+    # Select best model
+    best = available_models[0]
+    result["recommended_model"] = {
+        "model_id": best["model_id"],
+        "service": best["service"],
+        "port": best["port"],
+        "tags": best["tags"],
+        "match_score": best["match_score"],
+        "reasoning": f"Selected based on matching {best['match_score']} of {len(required_tags)} required capabilities"
+    }
+
+    result["alternatives"] = available_models[1:4] if len(available_models) > 1 else []
+
+    return json.dumps(result, indent=2)
+
+
+# =============================================================================
+# Phase 9: Backup & System Management
+# =============================================================================
+
+@mcp.tool()
+def backup_configuration(
+    backup_path: Optional[str] = None,
+    include_personas: bool = True,
+    include_prompts: bool = True,
+    include_tools: bool = True
+) -> str:
+    """
+    Backup Msty configuration to a file.
+
+    Args:
+        backup_path: Path to save backup (default: ~/.msty-admin/backups/)
+        include_personas: Include persona configurations
+        include_prompts: Include saved prompts
+        include_tools: Include MCP tool configurations
+
+    Returns:
+        Backup file path and contents summary
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "backup_contents": {},
+    }
+
+    backup_data = {
+        "backup_version": "1.0",
+        "created_at": datetime.now().isoformat(),
+        "msty_admin_version": SERVER_VERSION,
+    }
+
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+
+    if db_path and Path(db_path).exists():
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            if include_personas:
+                cursor.execute("SELECT * FROM personas")
+                personas = [dict(row) for row in cursor.fetchall()]
+                backup_data["personas"] = personas
+                result["backup_contents"]["personas"] = len(personas)
+
+            if include_prompts:
+                cursor.execute("SELECT * FROM prompts")
+                prompts = [dict(row) for row in cursor.fetchall()]
+                backup_data["prompts"] = prompts
+                result["backup_contents"]["prompts"] = len(prompts)
+
+            if include_tools:
+                cursor.execute("SELECT * FROM mcp_tools")
+                tools = [dict(row) for row in cursor.fetchall()]
+                backup_data["mcp_tools"] = tools
+                result["backup_contents"]["mcp_tools"] = len(tools)
+
+            conn.close()
+        except sqlite3.Error as e:
+            result["database_error"] = str(e)
+
+    # Also backup prompt templates
+    backup_data["prompt_templates"] = list(_prompt_templates.values())
+    result["backup_contents"]["prompt_templates"] = len(_prompt_templates)
+
+    # Save backup
+    if backup_path:
+        backup_file = Path(backup_path)
+    else:
+        backup_dir = Path.home() / ".msty-admin" / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = backup_dir / f"msty_backup_{timestamp}.json"
+
+    with open(backup_file, "w") as f:
+        json.dump(backup_data, f, indent=2, default=str)
+
+    result["backup_file"] = str(backup_file)
+    result["backup_size_bytes"] = backup_file.stat().st_size
+    result["status"] = "Backup completed successfully"
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def restore_configuration(
+    backup_path: str,
+    restore_personas: bool = True,
+    restore_prompts: bool = True,
+    restore_tools: bool = True,
+    dry_run: bool = True
+) -> str:
+    """
+    Restore Msty configuration from a backup file.
+
+    Args:
+        backup_path: Path to backup file
+        restore_personas: Restore persona configurations
+        restore_prompts: Restore saved prompts
+        restore_tools: Restore MCP tool configurations
+        dry_run: Preview changes without applying (default: True)
+
+    Returns:
+        Restore preview or result
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "backup_path": backup_path,
+        "dry_run": dry_run,
+        "restore_preview": {},
+    }
+
+    backup_file = Path(backup_path)
+    if not backup_file.exists():
+        result["error"] = f"Backup file not found: {backup_path}"
+        return json.dumps(result, indent=2)
+
+    try:
+        with open(backup_file) as f:
+            backup_data = json.load(f)
+    except json.JSONDecodeError as e:
+        result["error"] = f"Invalid backup file: {str(e)}"
+        return json.dumps(result, indent=2)
+
+    result["backup_info"] = {
+        "version": backup_data.get("backup_version"),
+        "created_at": backup_data.get("created_at"),
+        "msty_admin_version": backup_data.get("msty_admin_version"),
+    }
+
+    # Preview what would be restored
+    if restore_personas and "personas" in backup_data:
+        result["restore_preview"]["personas"] = len(backup_data["personas"])
+    if restore_prompts and "prompts" in backup_data:
+        result["restore_preview"]["prompts"] = len(backup_data["prompts"])
+    if restore_tools and "mcp_tools" in backup_data:
+        result["restore_preview"]["mcp_tools"] = len(backup_data["mcp_tools"])
+    if "prompt_templates" in backup_data:
+        result["restore_preview"]["prompt_templates"] = len(backup_data["prompt_templates"])
+
+    if dry_run:
+        result["status"] = "Dry run complete - no changes made"
+        result["note"] = "Set dry_run=False to apply the restore"
+        return json.dumps(result, indent=2)
+
+    # Actually restore
+    paths = get_msty_paths()
+    db_path = paths.get("database")
+    restored = {}
+
+    if db_path and Path(db_path).exists():
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Note: In production, you'd want proper INSERT OR REPLACE logic
+            # This is a simplified version
+            result["warning"] = "Database restore not fully implemented - only prompt templates restored"
+
+            conn.close()
+        except sqlite3.Error as e:
+            result["database_error"] = str(e)
+
+    # Restore prompt templates (these are in memory)
+    if "prompt_templates" in backup_data:
+        for template in backup_data["prompt_templates"]:
+            name = template.get("name")
+            if name:
+                _prompt_templates[name] = template
+        restored["prompt_templates"] = len(backup_data["prompt_templates"])
+
+    result["restored"] = restored
+    result["status"] = "Restore completed (partial - see warnings)"
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def get_system_resources() -> str:
+    """
+    Get current system resource usage.
+
+    Returns:
+        CPU, memory, disk usage and available resources
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "system": {},
+        "resources": {},
+    }
+
+    # System info
+    result["system"] = {
+        "platform": platform.system(),
+        "platform_release": platform.release(),
+        "platform_version": platform.version(),
+        "architecture": platform.machine(),
+        "processor": platform.processor(),
+        "python_version": platform.python_version(),
+    }
+
+    # CPU
+    result["resources"]["cpu"] = {
+        "physical_cores": psutil.cpu_count(logical=False),
+        "logical_cores": psutil.cpu_count(logical=True),
+        "current_usage_percent": psutil.cpu_percent(interval=0.1),
+        "per_cpu_percent": psutil.cpu_percent(interval=0.1, percpu=True),
+    }
+
+    # Memory
+    mem = psutil.virtual_memory()
+    result["resources"]["memory"] = {
+        "total_gb": round(mem.total / (1024**3), 2),
+        "available_gb": round(mem.available / (1024**3), 2),
+        "used_gb": round(mem.used / (1024**3), 2),
+        "percent_used": mem.percent,
+    }
+
+    # Disk
+    disk = psutil.disk_usage("/")
+    result["resources"]["disk"] = {
+        "total_gb": round(disk.total / (1024**3), 2),
+        "free_gb": round(disk.free / (1024**3), 2),
+        "used_gb": round(disk.used / (1024**3), 2),
+        "percent_used": disk.percent,
+    }
+
+    # Model recommendations based on available resources
+    available_ram = mem.available / (1024**3)
+    recommendations = []
+
+    if available_ram >= 32:
+        recommendations.append("Can run large models (70B+ parameters)")
+    elif available_ram >= 16:
+        recommendations.append("Can run medium models (13B-34B parameters)")
+    elif available_ram >= 8:
+        recommendations.append("Can run small models (7B-8B parameters)")
+    else:
+        recommendations.append("Limited to tiny models (3B or smaller)")
+
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        recommendations.append("Apple Silicon detected - MLX models recommended for best performance")
+
+    result["model_recommendations"] = recommendations
+
+    return json.dumps(result, indent=2)
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -2565,7 +4299,11 @@ def main():
     logger.info("Phase 3: Automation Bridge")
     logger.info("Phase 4: Intelligence Layer")
     logger.info("Phase 5: Tiered AI Workflow")
-    logger.info("Total tools: 24")
+    logger.info("Phase 6: Advanced Model Management")
+    logger.info("Phase 7: Conversation Management")
+    logger.info("Phase 8: Prompt Templates & Automation")
+    logger.info("Phase 9: Backup & System Management")
+    logger.info("Total tools: 42")
     mcp.run()
 
 

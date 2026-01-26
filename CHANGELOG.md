@@ -5,6 +5,32 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.0] - 2026-01-26
+
+### Added
+- **Phase 7: Conversation Management** - 3 new tools for working with chat history
+  - `export_conversations` - Export conversations in JSON, Markdown, or CSV format
+  - `search_conversations` - Search through conversation titles and messages
+  - `get_conversation_stats` - Usage statistics and activity patterns
+
+- **Phase 8: Prompt Templates & Automation** - 4 new tools for workflow automation
+  - `create_prompt_template` - Create reusable templates with {{variable}} placeholders
+  - `list_prompt_templates` - List available templates with built-in examples
+  - `run_prompt_template` - Execute templates with variable substitution
+  - `smart_model_router` - Intelligent model selection based on task analysis
+
+- **Phase 9: Backup & System Management** - 3 new tools for configuration management
+  - `backup_configuration` - Backup personas, prompts, and tools to JSON
+  - `restore_configuration` - Restore from backup with dry-run preview
+  - `get_system_resources` - CPU, memory, disk usage with model recommendations
+
+- **Total tools now: 42** (up from 32)
+
+### Changed
+- Server version bumped to 6.0.0
+- Updated docstring to document all 9 phases
+- Main entry point now logs all phases
+
 ## [5.2.0] - 2026-01-26
 
 ### Added
@@ -191,6 +217,7 @@ If upgrading from v4.x:
 
 | Version | Date | Phase | Tools |
 |---------|------|-------|-------|
+| 6.0.0 | 2026-01-26 | Phases 7-9 | 42 |
 | 5.2.0 | 2026-01-26 | Model Management | 32 |
 | 5.1.0 | 2026-01-26 | Tagging + Caching | 28 |
 | 5.0.1 | 2026-01-26 | Bugfix | 24 |
@@ -202,6 +229,7 @@ If upgrading from v4.x:
 | 2.0.0 | 2025-12-25 | Phase 2 | 10 |
 | 1.0.0 | 2025-12-24 | Phase 1 | 6 |
 
+[6.0.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.2.0...v6.0.0
 [5.2.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.0.1...v5.1.0
 [5.0.1]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.0.0...v5.0.1
