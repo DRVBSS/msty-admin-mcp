@@ -5,6 +5,28 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.6.0] - 2026-01-26
+
+### Added
+- **Enhanced Tagging System v2.0** - Complete rewrite with improved intelligence
+  - Context length awareness with `long_context` (100K+), `very_long_context` (250K+), `massive_context` (500K+)
+  - Quantization detection: `fp16`, `8bit`, `6bit`, `5bit`, `4bit`, `3bit`
+  - Architecture tags: `moe` (Mixture of Experts), `mlx`, `gguf`
+  - New size tier: `massive` (200B+ parameters)
+  - New capability tags: `thinking`, `math`, `science`, `instruct`, `chat`
+- `TAG_DEFINITIONS` constant with human-readable descriptions for all tags
+- `get_all_tags()` function to retrieve tag definitions
+- `detect_model_size()` function for parameter count extraction
+- `detect_context_length()` function with known model database
+- Improved pattern matching with negative lookaheads (e.g., `mini` but not `ministral`)
+- 61 unit tests for tagging module (all passing)
+
+### Changed
+- Size detection now properly handles 3-digit parameter counts (405B, 253B, 235B)
+- MoE models correctly detected via `A\d+B` pattern (e.g., A22B for active parameters)
+- Context tags are now cumulative (massive_context includes very_long_context includes long_context)
+- Better regex patterns to avoid false positives (`pro` but not `proxy`, `dev` but not `device`)
+
 ## [6.5.0] - 2026-01-26
 
 ### Added

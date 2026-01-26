@@ -8,7 +8,7 @@ All values can be overridden via environment variables.
 import os
 
 # Server version
-SERVER_VERSION = "6.5.0"
+SERVER_VERSION = "6.6.0"
 
 # Network configuration (configurable via environment)
 SIDECAR_HOST = os.environ.get("MSTY_SIDECAR_HOST", "127.0.0.1")
