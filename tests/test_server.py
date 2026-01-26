@@ -14,14 +14,12 @@ from unittest.mock import patch, MagicMock
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.server import (
-    get_msty_paths,
-    is_process_running,
-    get_table_names,
-    MstyInstallation,
-    MstyHealthReport,
-    DatabaseStats,
-)
+# Import from modular structure (v6.5.0+)
+from src.paths import get_msty_paths
+from src.network import is_process_running
+from src.database import get_table_names
+from src.models import MstyInstallation, MstyHealthReport, DatabaseStats
+from src.constants import SERVER_VERSION
 
 
 class TestPathResolution:
@@ -156,7 +154,7 @@ class TestMCPTools:
         assert isinstance(data, dict)
         assert "server" in data
         assert "available_tools" in data
-        assert data["server"]["version"] == "4.0.0"
+        assert data["server"]["version"] == SERVER_VERSION
 
 
 class TestSecurityFeatures:

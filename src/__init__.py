@@ -22,11 +22,9 @@ from .constants import SERVER_VERSION
 __version__ = SERVER_VERSION
 __author__ = "Pineapple 🍍"
 
-from .server import mcp, main
+# Import utility modules (no external dependencies)
 from .models import MstyInstallation, MstyHealthReport, DatabaseStats, PersonaConfig
 from .errors import ErrorCode, error_response, success_response
-
-# Utility modules (v6.5.0)
 from .paths import get_msty_paths, sanitize_path, expand_path, read_claude_desktop_config
 from .database import (
     get_database_connection, query_database, get_table_names,
@@ -40,10 +38,16 @@ from .network import (
 from .cache import ResponseCache, get_cached_models, cache_models, get_cache
 from .tagging import MODEL_TAGS, get_model_tags, find_models_by_tag
 
+# Lazy import for server module (requires mcp package)
+# Use: from src.server import mcp, main
+def _get_server():
+    """Lazy import for server module (requires mcp package)"""
+    from . import server
+    return server
+
 __all__ = [
-    # Core
-    "mcp",
-    "main",
+    # Core (lazy loaded)
+    "_get_server",
     "__version__",
     "__author__",
     # Models
