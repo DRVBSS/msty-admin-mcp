@@ -86,7 +86,7 @@ mcp = FastMCP("msty-admin")
 # Constants
 # =============================================================================
 
-SERVER_VERSION = "5.1.0"
+SERVER_VERSION = "5.2.0"
 
 # Configurable via environment variables
 SIDECAR_HOST = os.environ.get("MSTY_SIDECAR_HOST", "127.0.0.1")
@@ -844,9 +844,10 @@ def get_server_status() -> str:
             "phase_3_automation": ["get_sidecar_status", "list_available_models", "query_local_ai_service", "chat_with_local_model", "recommend_model", "list_model_tags", "find_model_by_tag"],
             "phase_3_cache": ["get_cache_stats", "clear_cache"],
             "phase_4_intelligence": ["get_model_performance_metrics", "analyse_conversation_patterns", "compare_model_responses", "optimise_knowledge_stacks", "suggest_persona_improvements"],
-            "phase_5_calibration": ["run_calibration_test", "evaluate_response_quality", "identify_handoff_triggers", "get_calibration_history"]
+            "phase_5_calibration": ["run_calibration_test", "evaluate_response_quality", "identify_handoff_triggers", "get_calibration_history"],
+            "phase_6_model_management": ["get_model_details", "benchmark_model", "list_local_model_files", "estimate_model_requirements"]
         },
-        "tool_count": 28,
+        "tool_count": 32,
         "msty_status": {
             "installed": paths.get("app") is not None or paths.get("app_alt") is not None,
             "database_available": paths.get("database") is not None,
@@ -1591,6 +1592,439 @@ def scan_database_locations() -> str:
         result["recommendation"] = f"Set MSTY_DATABASE_PATH environment variable to one of the found databases"
     else:
         result["recommendation"] = "No databases found. Msty 2.4.0+ may store data differently - check Msty settings or documentation"
+
+    return json.dumps(result, indent=2)
+
+
+# =============================================================================
+# Phase 6: Advanced Model Management
+# =============================================================================
+
+@mcp.tool()
+def get_model_details(model_id: str) -> str:
+    """
+    Get detailed information about a specific model.
+
+    Args:
+        model_id: The model ID to get details for
+
+    Returns:
+        Comprehensive model details including:
+        - Context length and parameters
+        - Service and port information
+        - Tags and capabilities
+        - File size (for local models)
+        - Recommended use cases
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "model_id": model_id,
+        "found": False,
+    }
+
+    # Search for model in all services
+    services = get_available_service_ports()
+
+    for service_name, service_info in services.items():
+        if service_info["available"]:
+            response = make_api_request("/v1/models", port=service_info["port"])
+            if response.get("success"):
+                data = response.get("data", {})
+                if isinstance(data, dict) and "data" in data:
+                    for model in data["data"]:
+                        if model.get("id") == model_id:
+                            result["found"] = True
+                            result["service"] = service_name
+                            result["port"] = service_info["port"]
+                            result["raw_info"] = model
+
+                            # Extract key details
+                            result["details"] = {
+                                "id": model.get("id"),
+                                "owned_by": model.get("owned_by"),
+                                "object": model.get("object"),
+                                "context_length": model.get("context_length"),
+                                "created": model.get("created"),
+                            }
+
+                            # Get tags
+                            result["tags"] = get_model_tags(model_id)
+
+                            # Determine capabilities based on tags
+                            tags = result["tags"]
+                            capabilities = []
+                            if "coding" in tags:
+                                capabilities.append("Code generation and review")
+                            if "reasoning" in tags:
+                                capabilities.append("Complex reasoning and analysis")
+                            if "creative" in tags:
+                                capabilities.append("Creative writing and storytelling")
+                            if "fast" in tags:
+                                capabilities.append("Quick responses, good for simple tasks")
+                            if "quality" in tags:
+                                capabilities.append("High-quality outputs")
+                            if "embedding" in tags:
+                                capabilities.append("Text embeddings for semantic search")
+                            if "vision" in tags:
+                                capabilities.append("Image understanding")
+                            if "long_context" in tags:
+                                capabilities.append("Long document processing")
+                            result["capabilities"] = capabilities
+
+                            # Recommend use cases
+                            use_cases = []
+                            if "coding" in tags:
+                                use_cases.extend(["Code review", "Bug fixing", "Code generation"])
+                            if "reasoning" in tags:
+                                use_cases.extend(["Problem solving", "Analysis", "Research"])
+                            if "creative" in tags:
+                                use_cases.extend(["Writing", "Brainstorming", "Content creation"])
+                            if "fast" in tags:
+                                use_cases.extend(["Quick Q&A", "Summarization", "Simple tasks"])
+                            if not use_cases:
+                                use_cases = ["General conversation", "Question answering"]
+                            result["recommended_use_cases"] = list(set(use_cases))
+
+                            break
+                if result["found"]:
+                    break
+
+    if not result["found"]:
+        result["error"] = f"Model '{model_id}' not found in any service"
+        result["suggestion"] = "Use list_available_models to see all available models"
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def benchmark_model(
+    model_id: str,
+    num_runs: int = 3,
+    prompt_lengths: Optional[List[int]] = None
+) -> str:
+    """
+    Run performance benchmarks on a local model.
+
+    Args:
+        model_id: Model to benchmark
+        num_runs: Number of test runs per prompt length (default: 3)
+        prompt_lengths: List of prompt lengths to test (default: [50, 200, 500])
+
+    Returns:
+        Benchmark results with tokens/second at different context sizes
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "model_id": model_id,
+        "num_runs": num_runs,
+        "benchmarks": [],
+        "summary": {}
+    }
+
+    if prompt_lengths is None:
+        prompt_lengths = [50, 200, 500]
+
+    # Find the model's port
+    port = get_chat_port_for_model(model_id)
+    result["port"] = port
+
+    # Skip embedding models
+    if any(x in model_id.lower() for x in ["embed", "bge", "nomic"]):
+        result["error"] = "Cannot benchmark embedding models - they don't support chat completions"
+        return json.dumps(result, indent=2)
+
+    # Generate test prompts of different lengths
+    base_prompt = "Explain the concept of "
+    topics = ["machine learning", "quantum computing", "renewable energy", "artificial intelligence", "blockchain technology"]
+
+    all_results = []
+
+    for target_length in prompt_lengths:
+        # Create a prompt of approximately target_length characters
+        prompt = base_prompt + topics[target_length % len(topics)]
+        while len(prompt) < target_length:
+            prompt += " and its applications in modern technology, including various use cases"
+        prompt = prompt[:target_length] + "? Be concise."
+
+        run_results = []
+        for run in range(num_runs):
+            start_time = time.time()
+            response = make_api_request(
+                "/v1/chat/completions",
+                port=port,
+                method="POST",
+                data={
+                    "model": model_id,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.7,
+                    "max_tokens": 256,
+                    "stream": False
+                },
+                timeout=60
+            )
+            elapsed = time.time() - start_time
+
+            if response.get("success"):
+                data = response.get("data", {})
+                usage = data.get("usage", {})
+                completion_tokens = usage.get("completion_tokens", 0)
+                prompt_tokens = usage.get("prompt_tokens", 0)
+
+                tps = completion_tokens / max(elapsed, 0.01)
+                run_results.append({
+                    "run": run + 1,
+                    "latency_seconds": round(elapsed, 3),
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "tokens_per_second": round(tps, 1)
+                })
+            else:
+                run_results.append({
+                    "run": run + 1,
+                    "error": response.get("error")
+                })
+
+        # Calculate averages for this prompt length
+        successful_runs = [r for r in run_results if "error" not in r]
+        if successful_runs:
+            avg_tps = sum(r["tokens_per_second"] for r in successful_runs) / len(successful_runs)
+            avg_latency = sum(r["latency_seconds"] for r in successful_runs) / len(successful_runs)
+        else:
+            avg_tps = 0
+            avg_latency = 0
+
+        all_results.append({
+            "prompt_length": target_length,
+            "runs": run_results,
+            "avg_tokens_per_second": round(avg_tps, 1),
+            "avg_latency_seconds": round(avg_latency, 3)
+        })
+
+    result["benchmarks"] = all_results
+
+    # Overall summary
+    all_successful = [r for bench in all_results for r in bench["runs"] if "error" not in r]
+    if all_successful:
+        result["summary"] = {
+            "total_runs": len(all_successful),
+            "overall_avg_tps": round(sum(r["tokens_per_second"] for r in all_successful) / len(all_successful), 1),
+            "min_tps": round(min(r["tokens_per_second"] for r in all_successful), 1),
+            "max_tps": round(max(r["tokens_per_second"] for r in all_successful), 1),
+            "overall_avg_latency": round(sum(r["latency_seconds"] for r in all_successful) / len(all_successful), 3),
+        }
+
+        # Performance rating
+        avg_tps = result["summary"]["overall_avg_tps"]
+        if avg_tps >= 50:
+            result["summary"]["rating"] = "Excellent"
+        elif avg_tps >= 30:
+            result["summary"]["rating"] = "Very Good"
+        elif avg_tps >= 15:
+            result["summary"]["rating"] = "Good"
+        elif avg_tps >= 5:
+            result["summary"]["rating"] = "Acceptable"
+        else:
+            result["summary"]["rating"] = "Slow"
+
+    # Record metrics
+    try:
+        init_metrics_db()
+        for bench in all_results:
+            for run in bench["runs"]:
+                if "error" not in run:
+                    record_model_metric(
+                        model_id=model_id,
+                        prompt_tokens=run.get("prompt_tokens", 0),
+                        completion_tokens=run.get("completion_tokens", 0),
+                        latency_seconds=run["latency_seconds"],
+                        success=True,
+                        use_case="benchmark"
+                    )
+    except:
+        pass
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def list_local_model_files() -> str:
+    """
+    List all local model files on disk (MLX and GGUF models).
+
+    Returns:
+        List of model files with sizes and locations
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "mlx_models": [],
+        "gguf_models": [],
+        "total_size_gb": 0
+    }
+
+    paths = get_msty_paths()
+    total_size = 0
+
+    # Scan MLX models
+    mlx_path = paths.get("mlx_models")
+    if mlx_path and Path(mlx_path).exists():
+        mlx_dir = Path(mlx_path)
+        for model_dir in mlx_dir.iterdir():
+            if model_dir.is_dir():
+                # Calculate total size of model directory
+                size_bytes = sum(f.stat().st_size for f in model_dir.rglob('*') if f.is_file())
+                size_gb = size_bytes / (1024 ** 3)
+                total_size += size_bytes
+
+                # Count files
+                file_count = sum(1 for f in model_dir.rglob('*') if f.is_file())
+
+                result["mlx_models"].append({
+                    "name": model_dir.name,
+                    "path": str(model_dir),
+                    "size_gb": round(size_gb, 2),
+                    "file_count": file_count
+                })
+
+    # Look for GGUF models in common locations
+    home = Path.home()
+    gguf_locations = [
+        home / ".cache/lm-studio/models",
+        home / ".ollama/models",
+        home / "Library/Application Support/MstyStudio/models",
+        home / "models",
+    ]
+
+    for gguf_dir in gguf_locations:
+        if gguf_dir.exists():
+            for gguf_file in gguf_dir.rglob("*.gguf"):
+                try:
+                    size_bytes = gguf_file.stat().st_size
+                    size_gb = size_bytes / (1024 ** 3)
+                    total_size += size_bytes
+
+                    result["gguf_models"].append({
+                        "name": gguf_file.stem,
+                        "path": str(gguf_file),
+                        "size_gb": round(size_gb, 2)
+                    })
+                except:
+                    pass
+
+    result["total_size_gb"] = round(total_size / (1024 ** 3), 2)
+    result["mlx_count"] = len(result["mlx_models"])
+    result["gguf_count"] = len(result["gguf_models"])
+
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def estimate_model_requirements(model_id: str) -> str:
+    """
+    Estimate hardware requirements for running a model.
+
+    Args:
+        model_id: Model ID to analyze
+
+    Returns:
+        Estimated memory requirements and recommendations
+    """
+    result = {
+        "timestamp": datetime.now().isoformat(),
+        "model_id": model_id,
+        "estimates": {}
+    }
+
+    # Get model details first
+    details_json = get_model_details(model_id)
+    details = json.loads(details_json)
+
+    if not details.get("found"):
+        result["error"] = f"Model '{model_id}' not found"
+        return json.dumps(result, indent=2)
+
+    result["service"] = details.get("service")
+    result["tags"] = details.get("tags", [])
+
+    # Extract size from model name
+    model_lower = model_id.lower()
+    param_size = None
+
+    # Try to extract parameter count
+    import re
+    size_patterns = [
+        (r'(\d+\.?\d*)b', 1),  # 7b, 13b, 70b
+        (r'(\d+)m', 0.001),     # 567m -> 0.567b
+    ]
+
+    for pattern, multiplier in size_patterns:
+        match = re.search(pattern, model_lower)
+        if match:
+            param_size = float(match.group(1)) * multiplier
+            break
+
+    if param_size:
+        result["estimated_parameters"] = f"{param_size}B"
+
+        # Estimate memory based on quantization
+        if "fp16" in model_lower or "f16" in model_lower:
+            bytes_per_param = 2
+            quant = "FP16"
+        elif "q8" in model_lower or "8bit" in model_lower:
+            bytes_per_param = 1
+            quant = "Q8/8-bit"
+        elif "q6" in model_lower or "6bit" in model_lower:
+            bytes_per_param = 0.75
+            quant = "Q6/6-bit"
+        elif "q5" in model_lower or "5bit" in model_lower:
+            bytes_per_param = 0.625
+            quant = "Q5/5-bit"
+        elif "q4" in model_lower or "4bit" in model_lower:
+            bytes_per_param = 0.5
+            quant = "Q4/4-bit"
+        elif "q3" in model_lower or "3bit" in model_lower:
+            bytes_per_param = 0.375
+            quant = "Q3/3-bit"
+        elif "q2" in model_lower or "2bit" in model_lower:
+            bytes_per_param = 0.25
+            quant = "Q2/2-bit"
+        else:
+            bytes_per_param = 0.5  # Assume Q4 as default
+            quant = "Unknown (assuming Q4)"
+
+        # Calculate memory
+        model_memory_gb = (param_size * 1e9 * bytes_per_param) / (1024 ** 3)
+        # Add overhead for KV cache and runtime (roughly 20-30%)
+        total_memory_gb = model_memory_gb * 1.25
+
+        result["estimates"] = {
+            "quantization": quant,
+            "model_memory_gb": round(model_memory_gb, 1),
+            "recommended_vram_gb": round(total_memory_gb, 1),
+            "recommended_ram_gb": round(total_memory_gb * 1.5, 1),  # CPU inference needs more
+        }
+
+        # Recommendations
+        recommendations = []
+        if total_memory_gb <= 8:
+            recommendations.append("✅ Should run on most modern Macs (8GB+ RAM)")
+        elif total_memory_gb <= 16:
+            recommendations.append("⚠️ Requires 16GB+ RAM Mac")
+        elif total_memory_gb <= 32:
+            recommendations.append("⚠️ Requires 32GB+ RAM Mac")
+        elif total_memory_gb <= 64:
+            recommendations.append("⚠️ Requires 64GB+ RAM Mac (M1/M2/M3 Max/Ultra)")
+        else:
+            recommendations.append("❌ Requires high-end workstation (96GB+ RAM)")
+
+        if details.get("service") == "mlx":
+            recommendations.append("💡 MLX optimized for Apple Silicon - uses unified memory efficiently")
+        elif details.get("service") == "llamacpp":
+            recommendations.append("💡 LLaMA.cpp can offload layers to CPU if needed")
+
+        result["recommendations"] = recommendations
+    else:
+        result["estimates"]["note"] = "Could not determine model size from name"
+        result["estimates"]["suggestion"] = "Check model card or documentation for requirements"
 
     return json.dumps(result, indent=2)
 

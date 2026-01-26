@@ -5,6 +5,19 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.0] - 2026-01-26
+
+### Added
+- **Phase 6: Advanced Model Management** - 4 new tools for model insights
+  - `get_model_details` - Comprehensive model information including capabilities and use cases
+  - `benchmark_model` - Performance benchmarks with tokens/second at different context sizes
+  - `list_local_model_files` - Scan disk for MLX and GGUF model files with sizes
+  - `estimate_model_requirements` - Estimate RAM/VRAM requirements based on model size and quantization
+- **Total tools now: 32**
+
+### Changed
+- Server status now includes Phase 6 tools
+
 ## [5.1.0] - 2026-01-26
 
 ### Added
@@ -178,6 +191,7 @@ If upgrading from v4.x:
 
 | Version | Date | Phase | Tools |
 |---------|------|-------|-------|
+| 5.2.0 | 2026-01-26 | Model Management | 32 |
 | 5.1.0 | 2026-01-26 | Tagging + Caching | 28 |
 | 5.0.1 | 2026-01-26 | Bugfix | 24 |
 | 5.0.0 | 2026-01-25 | Msty 2.4.0+ | 24 |
@@ -188,6 +202,7 @@ If upgrading from v4.x:
 | 2.0.0 | 2025-12-25 | Phase 2 | 10 |
 | 1.0.0 | 2025-12-24 | Phase 1 | 6 |
 
+[5.2.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.0.1...v5.1.0
 [5.0.1]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v4.1.0...v5.0.0
