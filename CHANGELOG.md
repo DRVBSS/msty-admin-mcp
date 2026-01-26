@@ -5,6 +5,24 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.1.0] - 2026-01-26
+
+### Added
+- **Comprehensive Model Tagging** - 60+ model-specific tag overrides for accurate routing
+- New pattern matches: `flash`, `lite`, `haiku`, `pro`, `ultra`, `nemotron`, `v3`, `dev`, `kimi-dev`, `oswe`, `grok-code`, `nemo`, `mistral-nemo`, `jina-embed`, `pro-image`
+- All Claude models now properly tagged with `coding`, `reasoning`, `creative`
+- All GPT models properly tagged with capabilities
+- All Gemini models properly tagged
+- Hybrid models (gemini-claude-*) properly tagged
+
+### Fixed
+- **Size detection order** - Now checks large sizes first to avoid false `small` matches on 253B models
+- Fixed Qwen3-235B incorrectly tagged as `small` (now `large`)
+- Fixed Nemotron-Ultra-253B incorrectly tagged as `small` (now `large`)
+- Fixed Mistral-Nemo missing `long_context` tag (has 1M context!)
+- Fixed Kimi-Dev-72B missing `coding` tag
+- Fixed Hermes-70B incorrectly tagged as `small` (now `large`)
+
 ## [6.0.2] - 2026-01-26
 
 ### Fixed
