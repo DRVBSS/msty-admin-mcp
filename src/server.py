@@ -95,7 +95,7 @@ mcp = FastMCP("msty-admin")
 # Constants
 # =============================================================================
 
-SERVER_VERSION = "6.0.0"
+SERVER_VERSION = "6.0.1"
 
 # Configurable via environment variables
 SIDECAR_HOST = os.environ.get("MSTY_SIDECAR_HOST", "127.0.0.1")
@@ -1552,58 +1552,106 @@ def scan_database_locations() -> str:
         "timestamp": datetime.now().isoformat(),
         "scan_locations": [],
         "found_databases": [],
+        "found_data_files": [],
         "current_config": get_msty_paths()
     }
 
-    # Locations to scan
+    # Locations to scan - expanded for Msty 2.4.0+
     scan_paths = [
         home / "Library/Application Support/MstyStudio",
         home / "Library/Application Support/MstySidecar",
         home / "Library/Containers/ai.msty.MstyStudio",
+        home / "Library/Caches/MstyStudio",
+        home / "Library/Preferences",  # May have plist files
         home / ".msty",
         home / ".config/msty",
+        home / ".local/share/msty",
     ]
 
+    # File patterns to search for (Msty 2.4.0+ may use various formats)
+    db_patterns = ["**/*.db", "**/*.sqlite", "**/*.sqlite3"]
+    data_patterns = ["**/*.json", "**/*.leveldb", "**/*.ldb", "**/MANIFEST*", "**/LOG", "**/CURRENT"]
+
     for scan_path in scan_paths:
-        location_info = {"path": str(scan_path), "exists": scan_path.exists(), "databases": []}
+        location_info = {
+            "path": str(scan_path),
+            "exists": scan_path.exists(),
+            "databases": [],
+            "data_files": [],
+            "all_files": []
+        }
 
         if scan_path.exists():
             try:
-                # Find all database files
-                for db_file in scan_path.glob("**/*.db"):
+                # List all files in directory (limited depth for performance)
+                all_files = []
+                for item in scan_path.iterdir():
                     try:
-                        stat = db_file.stat()
-                        location_info["databases"].append({
-                            "path": str(db_file),
-                            "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
-                        })
-                        result["found_databases"].append(str(db_file))
+                        if item.is_file():
+                            stat = item.stat()
+                            all_files.append({
+                                "name": item.name,
+                                "size_kb": round(stat.st_size / 1024, 1),
+                                "type": item.suffix or "no_ext"
+                            })
+                        elif item.is_dir():
+                            all_files.append({
+                                "name": item.name + "/",
+                                "type": "directory"
+                            })
                     except:
                         pass
+                location_info["all_files"] = all_files[:30]  # Limit for readability
 
-                for db_file in scan_path.glob("**/*.sqlite*"):
-                    try:
-                        stat = db_file.stat()
-                        location_info["databases"].append({
-                            "path": str(db_file),
-                            "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
-                        })
-                        result["found_databases"].append(str(db_file))
-                    except:
-                        pass
+                # Find database files
+                for pattern in db_patterns:
+                    for db_file in scan_path.glob(pattern):
+                        try:
+                            if db_file.is_file():
+                                stat = db_file.stat()
+                                location_info["databases"].append({
+                                    "path": str(db_file),
+                                    "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                                })
+                                result["found_databases"].append(str(db_file))
+                        except:
+                            pass
+
+                # Find other data files (JSON configs, LevelDB, etc.)
+                for pattern in data_patterns:
+                    for data_file in scan_path.glob(pattern):
+                        try:
+                            if data_file.is_file() and data_file.stat().st_size > 100:  # Skip tiny files
+                                stat = data_file.stat()
+                                file_info = {
+                                    "path": str(data_file),
+                                    "size_kb": round(stat.st_size / 1024, 1),
+                                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                                }
+                                # Check if it might contain conversation data
+                                if data_file.suffix == ".json" and stat.st_size > 1000:
+                                    file_info["note"] = "Potential config/data file"
+                                location_info["data_files"].append(file_info)
+                                result["found_data_files"].append(str(data_file))
+                        except:
+                            pass
+
             except PermissionError:
                 location_info["error"] = "Permission denied"
 
         result["scan_locations"].append(location_info)
 
     result["total_databases_found"] = len(result["found_databases"])
+    result["total_data_files_found"] = len(result["found_data_files"])
 
+    # Provide recommendations
     if result["found_databases"]:
-        result["recommendation"] = f"Set MSTY_DATABASE_PATH environment variable to one of the found databases"
+        result["recommendation"] = "Set MSTY_DATABASE_PATH environment variable to one of the found databases"
+    elif result["found_data_files"]:
+        result["recommendation"] = "No SQLite databases found, but data files exist. Msty 2.4.0+ may use JSON or other storage formats."
     else:
-        result["recommendation"] = "No databases found. Msty 2.4.0+ may store data differently - check Msty settings or documentation"
+        result["recommendation"] = "No data files found. Check if Msty has been used to create conversations, or check Msty settings for data location."
 
     return json.dumps(result, indent=2)
 

@@ -5,6 +5,15 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.1] - 2026-01-26
+
+### Fixed
+- Enhanced `scan_database_locations` to search more locations and file types
+- Now scans for JSON, LevelDB, and other data formats used by Msty 2.4.0+
+- Lists all files in directories to help identify where Msty stores data
+- Added `found_data_files` to track non-SQLite storage
+- Added import for `get_metrics_db_path` to fix prompt template tools
+
 ## [6.0.0] - 2026-01-26
 
 ### Added
