@@ -1,13 +1,35 @@
-# 🍍 Msty Admin MCP
+# Msty Admin MCP
 
-**AI-Powered Administration for Msty Studio Desktop**
+**AI-Powered Administration for Msty Studio Desktop 2.4.0+**
 
 An MCP (Model Context Protocol) server that transforms Claude into an intelligent system administrator for [Msty Studio Desktop](https://msty.ai). Query databases, manage configurations, orchestrate local AI models, and build tiered AI workflows—all through natural conversation.
 
-[![Version](https://img.shields.io/badge/version-4.1.0-blue.svg)](https://github.com/M-Pineapple/msty-admin-mcp/releases)
+[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](https://github.com/DRVBSS/msty-admin-mcp/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-yellow.svg)](https://python.org)
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://apple.com)
+[![Msty](https://img.shields.io/badge/Msty-2.4.0+-purple.svg)](https://msty.ai)
+
+> **v5.0.0** - Full support for Msty 2.4.0+ architecture with Local AI, MLX, LLaMA.cpp, and Vibe Proxy services.
+
+---
+
+## What's New in v5.0.0
+
+This version completely rewrites service detection for **Msty 2.4.0+**, which has Local AI services built directly into the main app (no separate Sidecar needed):
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **Local AI Service** | 11964 | Ollama-compatible API |
+| **MLX Service** | 11973 | Apple Silicon optimized models |
+| **LLaMA.cpp Service** | 11454 | GGUF model support |
+| **Vibe CLI Proxy** | 8317 | Unified proxy for all AI services |
+
+**Key Changes:**
+- Detects all 4 services automatically
+- Lists models from ALL services (not just one)
+- No longer requires `MstySidecar` process
+- Includes shell script launcher for reliable Claude Desktop integration
 
 ---
 
@@ -19,7 +41,7 @@ Msty Admin MCP lets you manage your entire Msty Studio installation through Clau
 
 > "Compare my local models on a coding task"
 
-> "Run calibration tests to see which model handles reasoning best"
+> "What models do I have available across all services?"
 
 > "What's the health status of my Msty installation?"
 
@@ -27,164 +49,20 @@ Claude handles the rest—querying databases, calling APIs, analysing results, a
 
 ---
 
-## Use Cases
-
-### 🔍 **1. Database Inspection & Insights**
-Query your Msty database directly through conversation. Access conversations, personas, prompts, knowledge stacks, and MCP tools without touching SQLite.
-
-```
-"Show me all my Msty personas"
-"How many conversations do I have?"
-"List my configured MCP tools"
-```
-
-### 🏥 **2. Health Monitoring & Diagnostics**
-Comprehensive health checks for your Msty installation—database integrity, storage usage, model cache status, and actionable recommendations.
-
-```
-"Check the health of my Msty installation"
-"Is Sidecar running?"
-"How much storage are my models using?"
-```
-
-### ⚙️ **3. Configuration Sync Between Claude & Msty**
-Export MCP tool configurations from Claude Desktop and prepare them for Msty import. Generate personas from templates. Convert your Claude preferences to Msty format.
-
-```
-"Export my Claude Desktop MCP tools"
-"Generate an Opus-style persona for Msty"
-"Sync my preferences to Msty format"
-```
-
-### 🤖 **4. Local Model Orchestration**
-Direct integration with Msty's Sidecar API. Chat with local models, compare responses across models, and get hardware-aware recommendations.
-
-```
-"List my available local models"
-"Chat with qwen2.5:7b about Python async"
-"Which model is best for coding on my hardware?"
-```
-
-### 📊 **5. Performance Analytics**
-Track tokens per second, latency, and error rates across your local models. Privacy-respecting conversation analytics. Identify usage patterns.
-
-```
-"How fast are my local models?"
-"Show performance metrics for the last 30 days"
-"Which model has the best success rate?"
-```
-
-### 🎯 **6. Model Calibration & Quality Testing**
-Test your local models against standardised prompts across categories (reasoning, coding, writing, analysis, creative). Score response quality. Track improvement over time.
-
-```
-"Run calibration tests on my Qwen model"
-"Test my models on reasoning tasks"
-"Show my calibration history"
-```
-
-### 🔄 **7. Tiered AI Workflow (Claude + Local)**
-Identify which tasks your local models handle well and which should escalate to Claude. Build efficient hybrid workflows where simple tasks go local and complex tasks go to Claude.
-
-```
-"What tasks should I hand off to Claude?"
-"Identify patterns where local models fail"
-"Compare Claude vs local on this task"
-```
-
-### 🔬 **8. Database Discovery (Advanced)**
-Through this MCP, we discovered Msty's internal database structure at:
-```
-~/Library/Application Support/MstyStudio/File System/000/t/00/00000000
-```
-
-This SQLite database contains tables for:
-- `personas` - Your configured personas
-- `tools` - MCP tool configurations
-- `toolConfigs` - Tool parameters
-- `conversationTexts` - Chat history
-- `knowledgeStacks` - RAG configurations
-- And more...
-
-**Note**: Direct database manipulation is possible when Msty is closed, but unsupported. Use at your own risk.
-
----
-
-## Key Features
-
-| Feature | Description |
-|---------|-------------|
-| **24 Tools** | Comprehensive administration toolkit |
-| **Read-Only by Default** | Never writes to Msty's database |
-| **Performance Tracking** | Automatic metrics for all local model calls |
-| **Calibration System** | Built-in quality testing framework |
-| **Hardware-Aware** | Recommendations based on your Mac's specs |
-| **Privacy-Respecting** | No data sent externally |
-
----
-
-## Available Tools (24 Total)
-
-### Phase 1: Installation & Health
-| Tool | What It Does |
-|------|--------------|
-| `detect_msty_installation` | Find Msty Studio, verify paths, check running status |
-| `read_msty_database` | Query conversations, personas, prompts, tools |
-| `list_configured_tools` | View MCP toolbox configuration |
-| `get_model_providers` | List AI providers and local models |
-| `analyse_msty_health` | Database integrity, storage, model cache, recommendations |
-| `get_server_status` | MCP server info and capabilities |
-
-### Phase 2: Configuration Management
-| Tool | What It Does |
-|------|--------------|
-| `export_tool_config` | Export MCP configs for backup or sync |
-| `import_tool_config` | Validate and prepare tools for Msty import |
-| `generate_persona` | Create personas from templates (opus, coder, writer, minimal) |
-| `sync_claude_preferences` | Convert Claude Desktop preferences to Msty persona |
-
-### Phase 3: Local Model Integration
-| Tool | What It Does |
-|------|--------------|
-| `get_sidecar_status` | Check Sidecar and Local AI Service health |
-| `list_available_models` | Query models via Ollama-compatible API |
-| `query_local_ai_service` | Direct low-level API access |
-| `chat_with_local_model` | Send messages with automatic metric tracking |
-| `recommend_model` | Hardware-aware model recommendations by use case |
-
-### Phase 4: Intelligence & Analytics
-| Tool | What It Does |
-|------|--------------|
-| `get_model_performance_metrics` | Tokens/sec, latency, error rates over time |
-| `analyse_conversation_patterns` | Privacy-respecting usage analytics |
-| `compare_model_responses` | Same prompt to multiple models, compare quality/speed |
-| `optimise_knowledge_stacks` | Analyse and recommend improvements |
-| `suggest_persona_improvements` | AI-powered persona optimisation |
-
-### Phase 5: Calibration & Workflow
-| Tool | What It Does |
-|------|--------------|
-| `run_calibration_test` | Test models across categories with quality scoring |
-| `evaluate_response_quality` | Score any response using heuristic evaluation |
-| `identify_handoff_triggers` | Track patterns that should escalate to Claude |
-| `get_calibration_history` | Historical results with trends and statistics |
-
----
-
-## Installation
+## Quick Start
 
 ### Prerequisites
 
-- **macOS** (Apple Silicon or Intel)
+- **macOS** (Apple Silicon recommended)
 - **Python 3.10+**
-- **[Msty Studio Desktop](https://msty.ai)** installed
-- **Msty Sidecar** running (for local model features)
+- **[Msty Studio Desktop 2.4.0+](https://msty.ai)** installed
+- **Claude Desktop** with MCP support
 
-### Quick Start
+### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/M-Pineapple/msty-admin-mcp.git
+git clone https://github.com/DRVBSS/msty-admin-mcp.git
 cd msty-admin-mcp
 
 # Create virtual environment
@@ -197,256 +75,210 @@ pip install -r requirements.txt
 
 ### Claude Desktop Configuration
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Important**: Claude Desktop doesn't always respect the `cwd` setting, so we use a shell script launcher.
 
-```json
-{
-  "mcpServers": {
-    "msty-admin": {
-      "command": "/absolute/path/to/msty-admin-mcp/.venv/bin/python",
-      "args": ["-m", "src.server"],
-      "cwd": "/absolute/path/to/msty-admin-mcp"
-    }
-  }
-}
-```
+1. The repository includes `run_msty_server.sh`. Make sure it's executable:
+   ```bash
+   chmod +x run_msty_server.sh
+   ```
 
-Restart Claude Desktop. You should see "msty-admin" in your available tools.
+2. Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+   ```json
+   {
+     "mcpServers": {
+       "msty-admin": {
+         "command": "/absolute/path/to/msty-admin-mcp/run_msty_server.sh",
+         "env": {
+           "MSTY_TIMEOUT": "30"
+         }
+       }
+     }
+   }
+   ```
 
-### Environment Variables (Optional)
+3. **Restart Claude Desktop** (Cmd+Q, then reopen)
 
-Customise the MCP behaviour with these environment variables:
+4. You should see "msty-admin" in your available tools with 24 tools loaded.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MSTY_SIDECAR_HOST` | `127.0.0.1` | Sidecar API host address |
-| `MSTY_AI_PORT` | `11964` | Local AI Service port |
-| `MSTY_PROXY_PORT` | `11932` | Sidecar proxy port |
-| `MSTY_TIMEOUT` | `10` | API request timeout (seconds) |
+---
 
-Example with custom configuration:
+## Available Tools (24 Total)
 
-```json
-{
-  "mcpServers": {
-    "msty-admin": {
-      "command": "/absolute/path/to/msty-admin-mcp/.venv/bin/python",
-      "args": ["-m", "src.server"],
-      "cwd": "/absolute/path/to/msty-admin-mcp",
-      "env": {
-        "MSTY_TIMEOUT": "30"
-      }
-    }
-  }
-}
-```
+### Phase 1: Installation & Health
+| Tool | Description |
+|------|-------------|
+| `detect_msty_installation` | Find Msty Studio, verify paths, check running status |
+| `read_msty_database` | Query conversations, personas, prompts, tools |
+| `list_configured_tools` | View MCP toolbox configuration |
+| `get_model_providers` | List AI providers and local models |
+| `analyse_msty_health` | Database integrity, storage, all 4 service status |
+| `get_server_status` | MCP server info and capabilities |
+
+### Phase 2: Configuration Management
+| Tool | Description |
+|------|-------------|
+| `export_tool_config` | Export MCP configs for backup or sync |
+| `import_tool_config` | Validate and prepare tools for Msty import |
+| `generate_persona` | Create personas from templates (opus, coder, writer, minimal) |
+| `sync_claude_preferences` | Convert Claude Desktop preferences to Msty persona |
+
+### Phase 3: Local Model Integration
+| Tool | Description |
+|------|-------------|
+| `get_sidecar_status` | Check all 4 services (Local AI, MLX, LLaMA.cpp, Vibe Proxy) |
+| `list_available_models` | Query models from ALL services with breakdown |
+| `query_local_ai_service` | Direct low-level API access |
+| `chat_with_local_model` | Send messages with automatic metric tracking |
+| `recommend_model` | Hardware-aware model recommendations by use case |
+
+### Phase 4: Intelligence & Analytics
+| Tool | Description |
+|------|-------------|
+| `get_model_performance_metrics` | Tokens/sec, latency, error rates over time |
+| `analyse_conversation_patterns` | Privacy-respecting usage analytics |
+| `compare_model_responses` | Same prompt to multiple models, compare quality/speed |
+| `optimise_knowledge_stacks` | Analyse and recommend improvements |
+| `suggest_persona_improvements` | AI-powered persona optimisation |
+
+### Phase 5: Calibration & Workflow
+| Tool | Description |
+|------|-------------|
+| `run_calibration_test` | Test models across categories with quality scoring |
+| `evaluate_response_quality` | Score any response using heuristic evaluation |
+| `identify_handoff_triggers` | Track patterns that should escalate to Claude |
+| `get_calibration_history` | Historical results with trends and statistics |
 
 ---
 
 ## Usage Examples
 
-### Check Your Installation
+### Check Service Status
 
 ```
-You: What's the status of my Msty installation?
+You: What's the status of my Msty services?
 
-Claude: Your Msty Studio is installed at /Applications/MstyStudio.app 
-        (version 2.2.0). Sidecar is running with 3 models available.
-        Database is healthy at 45MB. No issues detected.
+Claude: All 4 services are running:
+        ✅ Local AI Service (port 11964) - 2 models
+        ✅ MLX Service (port 11973) - 11 models
+        ✅ LLaMA.cpp Service (port 11454) - 10 models
+        ✅ Vibe CLI Proxy (port 8317) - 36 models
+
+        Total: 59 models available
 ```
 
-### Query Your Data
+### List All Models
 
 ```
-You: Show me my Msty personas
+You: What models do I have?
 
-Claude: You have 3 personas configured:
-        1. "Opus Assistant" - British English, quality focus (temp: 0.7)
-        2. "Swift Dev Assistant" - Development focused (temp: 0.3)
-        3. "Current Ventures" - Business operations (temp: 0.5)
+Claude: Found 59 models across all services:
+
+        MLX (Apple Silicon):
+        - Qwen3-235B-A22B-8bit
+        - Hermes-4-405B-MLX-6bit
+        - DeepSeek-Coder-V2-Instruct-Q4
+        ...
+
+        LLaMA.cpp (GGUF):
+        - DeepSeek-V3-0324-UD-Q4_K_XL
+        - Llama-3.3-70B-Instruct-Q8_0
+        - Nemotron-Ultra-253B
+        ...
 ```
 
-### Compare Local Models
+### Health Check
 
 ```
-You: Compare my local models on this coding task: 
-     "Write a Python function to find duplicates in a list"
+You: Check the health of my Msty installation
 
-Claude: Tested 2 models:
-        
-        qwen2.5-coder:7b
-        ├─ Quality: 0.85 | Speed: 38 tok/s | Latency: 2.1s
-        └─ Clean implementation with list comprehension
-        
-        qwen2.5:7b  
-        ├─ Quality: 0.72 | Speed: 42 tok/s | Latency: 1.8s
-        └─ Works but less elegant
-        
-        Winner (balanced): qwen2.5-coder:7b
+Claude: Health Status: ✅ Healthy
+
+        Msty Studio: Running ✅
+        Local AI Service (port 11964): Running ✅
+        MLX Service (port 11973): Running ✅
+        LLaMA.cpp Service (port 11454): Running ✅
+
+        No issues detected.
 ```
 
-### Run Calibration
+---
 
-```
-You: Run calibration tests on my Qwen model for reasoning tasks
+## Environment Variables
 
-Claude: Calibration Results for qwen2.5:7b (Reasoning)
-        
-        Test 1: Bat and ball problem
-        ├─ Score: 0.82 ✅ PASSED
-        └─ Correctly identified $0.05
-        
-        Test 2: Widget machines problem  
-        ├─ Score: 0.78 ✅ PASSED
-        └─ Showed step-by-step reasoning
-        
-        Summary: 2/2 passed, average score 0.80
-```
+Customize behavior with these environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MSTY_SIDECAR_HOST` | `127.0.0.1` | Service host address |
+| `MSTY_AI_PORT` | `11964` | Local AI Service port |
+| `MSTY_MLX_PORT` | `11973` | MLX Service port |
+| `MSTY_LLAMACPP_PORT` | `11454` | LLaMA.cpp Service port |
+| `MSTY_VIBE_PORT` | `8317` | Vibe CLI Proxy port |
+| `MSTY_TIMEOUT` | `10` | API request timeout (seconds) |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Claude Desktop                        │
-│                         │                                │
-│                    MCP Protocol                          │
-│                         │                                │
-│              ┌──────────┴──────────┐                    │
-│              ▼                     ▼                    │
-│    ┌─────────────────┐   ┌─────────────────┐           │
-│    │ Msty Admin MCP  │   │  Other MCPs     │           │
-│    │   (24 tools)    │   │ (Memory, etc.)  │           │
-│    └────────┬────────┘   └─────────────────┘           │
-└─────────────┼───────────────────────────────────────────┘
-              │
-   ┌──────────┴──────────┐
-   ▼                     ▼
-┌──────────┐      ┌──────────────┐
-│  Msty    │      │   Sidecar    │
-│ Database │      │  Local AI    │
-│ (SQLite) │      │   Service    │
-└──────────┘      └──────────────┘
-     │                   │
-     │            ┌──────┴──────┐
-     │            ▼             ▼
-     │      ┌──────────┐  ┌──────────┐
-     │      │ Qwen 2.5 │  │ Llama 3  │
-     │      │   7B     │  │   8B     │
-     │      └──────────┘  └──────────┘
-     │
-     ▼
-┌────────────────────────────────────┐
-│ ~/Library/Application Support/     │
-│ MstyStudio/File System/000/t/00/   │
-│ 00000000 (SQLite Database)         │
-├────────────────────────────────────┤
-│ Tables:                            │
-│ • personas                         │
-│ • tools                            │
-│ • toolConfigs                      │
-│ • conversationTexts                │
-│ • knowledgeStacks                  │
-│ • and more...                      │
-└────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      Claude Desktop                          │
+│                           │                                  │
+│                      MCP Protocol                            │
+│                           │                                  │
+│                ┌──────────┴──────────┐                      │
+│                ▼                     ▼                      │
+│      ┌─────────────────┐   ┌─────────────────┐             │
+│      │ Msty Admin MCP  │   │  Other MCPs     │             │
+│      │   (24 tools)    │   │                 │             │
+│      └────────┬────────┘   └─────────────────┘             │
+└───────────────┼─────────────────────────────────────────────┘
+                │
+     ┌──────────┴──────────────────────────────┐
+     ▼                                         ▼
+┌──────────┐                          ┌──────────────────┐
+│  Msty    │                          │   Msty Studio    │
+│ Database │                          │   2.4.0+ App     │
+│ (SQLite) │                          └────────┬─────────┘
+└──────────┘                                   │
+                          ┌────────────────────┼────────────────────┐
+                          ▼                    ▼                    ▼
+                   ┌────────────┐      ┌────────────┐      ┌────────────┐
+                   │ Local AI   │      │    MLX     │      │ LLaMA.cpp  │
+                   │  :11964    │      │   :11973   │      │   :11454   │
+                   └────────────┘      └────────────┘      └────────────┘
+                          │                    │                    │
+                          └────────────────────┼────────────────────┘
+                                               ▼
+                                        ┌────────────┐
+                                        │ Vibe Proxy │
+                                        │   :8317    │
+                                        └────────────┘
 ```
 
-### Data Storage
-
-| Location | Purpose |
-|----------|--------|
-| Msty Database | Read-only queries (conversations, personas, etc.) |
-| `~/.msty-admin/` | MCP's own metrics and calibration data |
-
-The MCP never writes to Msty's database—it only reads. All metrics and calibration results are stored separately.
-
 ---
 
-## Hardware Recommendations
+## Troubleshooting
 
-### For Basic Use (Inspection, Health Checks)
-- Any Mac with Msty installed
-- No local models required
+### "ModuleNotFoundError: No module named 'src'"
 
-### For Local Model Features
-| RAM | Recommended Models | Quality |
-|-----|-------------------|--------|
-| 8GB | qwen2.5:3b, gemma3:4b | Basic |
-| 16GB | qwen2.5:7b, qwen2.5-coder:7b | Good |
-| 32GB | qwen2.5:14b, llama3.1:8b | Very Good |
-| 64GB+ | qwen2.5:32b, mixtral:8x7b | Excellent |
-| 128GB+ | qwen2.5:72b, llama3.1:70b | Near-Claude |
+Claude Desktop isn't running from the correct directory. Make sure you're using the shell script launcher (`run_msty_server.sh`) instead of calling Python directly.
 
-### Performance Expectations (Apple Silicon)
+### "No Local AI services are running"
 
-| Model | M1 Pro 16GB | M2 Max 64GB | M3 Max 128GB |
-|-------|-------------|-------------|--------------|
-| 7B | 30-45 tok/s | 50-70 tok/s | 60-80 tok/s |
-| 14B | Slow | 30-45 tok/s | 45-60 tok/s |
-| 32B | ❌ | 15-25 tok/s | 25-40 tok/s |
-| 70B | ❌ | ❌ | 10-20 tok/s |
+1. Open Msty Studio
+2. Go to Settings → Local AI / MLX / LLaMA.cpp
+3. Make sure the services show "Running"
 
----
+### Claude doesn't see the msty-admin tools
 
-## FAQ
+1. Check your `claude_desktop_config.json` has the correct absolute path
+2. Make sure `run_msty_server.sh` is executable (`chmod +x`)
+3. Restart Claude Desktop completely (Cmd+Q, then reopen)
 
-### General
+### Only seeing 2 embedding models
 
-**Q: Do I need Msty Studio Desktop installed?**  
-A: Yes. This MCP is specifically designed to administer Msty Studio. Without it, most tools won't function.
-
-**Q: Does this work on Windows or Linux?**  
-A: Currently macOS only. Msty Studio Desktop is a macOS application.
-
-**Q: Is my data safe?**  
-A: The MCP only reads from Msty's database—it never writes to it. Metrics and calibration data are stored separately in `~/.msty-admin/`. No data is sent externally.
-
-### Local Models
-
-**Q: Do I need local models installed?**  
-A: For basic features (database queries, health checks), no. For local model features (chat, compare, calibrate), you need Msty Sidecar running with at least one model.
-
-**Q: Which local models work best?**  
-A: Use `recommend_model` with your use case. Generally:
-- **Coding**: qwen2.5-coder (7B or 32B depending on your RAM)
-- **General**: qwen2.5 (7B for speed, 32B for quality)
-- **Fast responses**: gemma3:4b or qwen3:0.6b
-
-**Q: What's the Sidecar?**  
-A: Msty Sidecar is the background service that hosts local models. It provides an Ollama-compatible API on port 11964.
-
-**Q: Can local models use MCP tools?**  
-A: Yes, but smaller models (7B and below) often struggle with complex tool orchestration. Models 14B+ handle tools much better. For reliable MCP tool usage, consider 32B+ models or stick with Claude for complex workflows.
-
-### Calibration
-
-**Q: What is calibration?**  
-A: Calibration tests your local models against standardised prompts to measure quality. Categories include reasoning, coding, writing, analysis, and creative tasks.
-
-**Q: What's a good calibration score?**  
-A: Scores range 0.0-1.0. Generally:
-- 0.8+ = Excellent
-- 0.6-0.8 = Good (passes threshold)
-- 0.4-0.6 = Fair
-- Below 0.4 = Poor
-
-**Q: What are handoff triggers?**  
-A: Patterns that indicate a task should be handled by Claude instead of a local model. The MCP learns these from failed calibration tests.
-
-### Troubleshooting
-
-**Q: Claude doesn't see the msty-admin tools**  
-A: Check your `claude_desktop_config.json` paths are absolute (not relative). Restart Claude Desktop after changes.
-
-**Q: "Sidecar not running" error**  
-A: Start Msty Sidecar from the Msty Studio menu bar icon, or ensure Msty is open.
-
-**Q: "Database not found" error**  
-A: Msty stores its database in `~/Library/Application Support/MstyStudio/File System/000/t/00/00000000`. Ensure Msty has been launched at least once.
-
-**Q: Model comparison takes too long**  
-A: Each model runs sequentially. Limit comparisons to 3-5 models. Larger models (32B+) take longer.
+The models shown depend on which service responds first. Use `list_available_models` to see ALL models from all services with the `by_service` breakdown.
 
 ---
 
@@ -460,8 +292,10 @@ msty-admin-mcp/
 │   └── phase4_5_tools.py   # Metrics and calibration utilities
 ├── tests/
 │   └── test_server.py
+├── run_msty_server.sh      # Shell script launcher (required!)
 ├── requirements.txt
 ├── pyproject.toml
+├── CHANGELOG.md
 ├── LICENSE
 └── README.md
 ```
@@ -480,28 +314,12 @@ Contributions welcome! Please:
 
 ---
 
-## Roadmap
+## Credits
 
-- [ ] Windows/Linux support (when Msty supports it)
-- [ ] Direct persona import via API (pending Msty API)
-- [ ] Automatic model download recommendations
-- [ ] Integration with Ollama CLI
-- [ ] Web UI for metrics dashboard
+- **Original Author**: [Pineapple](https://github.com/M-Pineapple) - Created the original msty-admin-mcp
+- **v5.0.0 Fork**: [DBSS](https://github.com/DRVBSS) - Msty 2.4.0+ compatibility updates
 
 ---
-## 💖 Support This Project
-
-If Claude Command Runner has helped enhance your development workflow or saved you time with intelligent command execution, consider supporting its development:
-
-<a href="https://www.buymeacoffee.com/mpineapple" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
-
-Your support helps me:
-* Maintain and improve Claude Command Runner with new features
-* Keep the project open-source and free for everyone
-* Dedicate more time to addressing user requests and bug fixes
-* Explore new terminal integrations and command intelligence
-
-Thank you for considering supporting my work! 🙏
 
 ## License
 
@@ -514,9 +332,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [Msty Studio](https://msty.ai) - The excellent local AI application this MCP administers
 - [Anthropic](https://anthropic.com) - For Claude and the MCP protocol
 - [Model Context Protocol](https://modelcontextprotocol.io) - The foundation making this possible
-
----
-
-**Created by Pineapple 🍍**
-
-*Making local AI administration effortless.*

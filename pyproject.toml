@@ -4,12 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "msty-admin-mcp"
-version = "4.1.0"
-description = "MCP Server for Msty Studio Desktop Administration - Database insights, configuration management, hardware optimization, and Claude Desktop sync"
+version = "5.0.0"
+description = "MCP Server for Msty Studio Desktop 2.4.0+ Administration - Full support for Local AI, MLX, LLaMA.cpp, and Vibe Proxy services"
 readme = "README.md"
 license = "MIT"
 authors = [
-    { name = "Pineapple 🍍", email = "pineapple@currentventures.co" }
+    { name = "DBSS", email = "drivebossllc@gmail.com" },
+    { name = "Pineapple", email = "pineapple@currentventures.co" }
 ]
 keywords = [
     "mcp",
@@ -18,7 +19,10 @@ keywords = [
     "ai-administration",
     "local-llm",
     "claude-desktop",
-    "automation"
+    "automation",
+    "mlx",
+    "llamacpp",
+    "apple-silicon"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -50,10 +54,11 @@ dev = [
 msty-admin-mcp = "src.server:main"
 
 [project.urls]
-Homepage = "https://github.com/M-Pineapple/msty-admin-mcp"
-Documentation = "https://github.com/M-Pineapple/msty-admin-mcp#readme"
-Repository = "https://github.com/M-Pineapple/msty-admin-mcp"
-Issues = "https://github.com/M-Pineapple/msty-admin-mcp/issues"
+Homepage = "https://github.com/DRVBSS/msty-admin-mcp"
+Documentation = "https://github.com/DRVBSS/msty-admin-mcp#readme"
+Repository = "https://github.com/DRVBSS/msty-admin-mcp"
+Issues = "https://github.com/DRVBSS/msty-admin-mcp/issues"
+Upstream = "https://github.com/M-Pineapple/msty-admin-mcp"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

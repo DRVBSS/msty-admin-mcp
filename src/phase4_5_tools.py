@@ -15,6 +15,7 @@ Phase 5: Tiered AI Workflow
 - get_calibration_history
 
 Created by Pineapple 🍍 AI Administration System
+Fixed by Claude - completed truncated evaluate_response_heuristic function
 """
 
 import json
@@ -392,4 +393,104 @@ def evaluate_response_heuristic(
     response_len = len(response)
     if response_len < 50:
         evaluation["criteria_scores"]["length"] = 0.3
-        evaluation["notes"].append("Response may
+        evaluation["notes"].append("Response may be too brief")
+    elif response_len < 100:
+        evaluation["criteria_scores"]["length"] = 0.5
+        evaluation["notes"].append("Response is relatively short")
+    elif response_len < 2000:
+        evaluation["criteria_scores"]["length"] = 1.0
+    elif response_len < 5000:
+        evaluation["criteria_scores"]["length"] = 0.8
+        evaluation["notes"].append("Response is quite long")
+    else:
+        evaluation["criteria_scores"]["length"] = 0.5
+        evaluation["notes"].append("Response may be excessively long")
+    
+    # Check for structure (paragraphs, lists, code blocks)
+    has_structure = False
+    if "\n\n" in response:
+        has_structure = True
+    if "- " in response or "* " in response or any(f"{i}." in response for i in range(1, 10)):
+        has_structure = True
+    if "```" in response:
+        has_structure = True
+    
+    if has_structure:
+        evaluation["criteria_scores"]["structure"] = 1.0
+    else:
+        evaluation["criteria_scores"]["structure"] = 0.6
+        evaluation["notes"].append("Response lacks clear structure")
+    
+    # Category-specific checks
+    if category == "coding":
+        # Check for code presence
+        if "```" in response or "def " in response or "function " in response:
+            evaluation["criteria_scores"]["code_presence"] = 1.0
+        else:
+            evaluation["criteria_scores"]["code_presence"] = 0.3
+            evaluation["notes"].append("Coding response lacks code blocks")
+        
+        # Check for comments/explanation
+        if "#" in response or "//" in response or "explanation" in response.lower():
+            evaluation["criteria_scores"]["explanation"] = 1.0
+        else:
+            evaluation["criteria_scores"]["explanation"] = 0.5
+            evaluation["notes"].append("Code lacks comments or explanation")
+    
+    elif category == "reasoning":
+        # Check for step-by-step reasoning
+        reasoning_indicators = ["step", "first", "then", "therefore", "because", "so", "thus"]
+        reasoning_count = sum(1 for indicator in reasoning_indicators if indicator in response.lower())
+        
+        if reasoning_count >= 3:
+            evaluation["criteria_scores"]["reasoning"] = 1.0
+        elif reasoning_count >= 1:
+            evaluation["criteria_scores"]["reasoning"] = 0.7
+            evaluation["notes"].append("Could show more explicit reasoning steps")
+        else:
+            evaluation["criteria_scores"]["reasoning"] = 0.3
+            evaluation["notes"].append("Response lacks clear reasoning steps")
+    
+    elif category == "writing":
+        # Check for appropriate tone and structure
+        if len(response.split()) >= 20:
+            evaluation["criteria_scores"]["substance"] = 1.0
+        else:
+            evaluation["criteria_scores"]["substance"] = 0.5
+            evaluation["notes"].append("Writing response may lack substance")
+    
+    elif category == "analysis":
+        # Check for balanced analysis
+        balance_indicators = ["however", "on the other hand", "alternatively", "pros", "cons", "benefit", "risk"]
+        balance_count = sum(1 for indicator in balance_indicators if indicator in response.lower())
+        
+        if balance_count >= 2:
+            evaluation["criteria_scores"]["balance"] = 1.0
+        elif balance_count >= 1:
+            evaluation["criteria_scores"]["balance"] = 0.7
+            evaluation["notes"].append("Analysis could be more balanced")
+        else:
+            evaluation["criteria_scores"]["balance"] = 0.4
+            evaluation["notes"].append("Analysis may lack balance or multiple perspectives")
+    
+    elif category == "creative":
+        # Creative responses are harder to evaluate heuristically
+        # Just check for reasonable length and some engagement
+        if response_len >= 50:
+            evaluation["criteria_scores"]["creativity"] = 0.8
+        else:
+            evaluation["criteria_scores"]["creativity"] = 0.5
+            evaluation["notes"].append("Creative response may be underdeveloped")
+    
+    # Calculate overall score
+    if evaluation["criteria_scores"]:
+        scores = list(evaluation["criteria_scores"].values())
+        evaluation["score"] = round(sum(scores) / len(scores), 2)
+    
+    return evaluation
+
+
+def generate_test_id(model_id: str, prompt: str) -> str:
+    """Generate a unique test ID based on model and prompt"""
+    content = f"{model_id}:{prompt}:{datetime.now().isoformat()}"
+    return hashlib.sha256(content.encode()).hexdigest()[:16]

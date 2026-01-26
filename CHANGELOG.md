@@ -5,6 +5,42 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-01-25
+
+### Added
+- **Full Msty 2.4.0+ Support** - Complete rewrite of service detection for new architecture
+  - `MLX_SERVICE_PORT` (11973) - Apple Silicon optimized MLX models
+  - `LLAMACPP_SERVICE_PORT` (11454) - LLaMA.cpp GGUF models
+  - `VIBE_PROXY_PORT` (8317) - Unified proxy for all AI services
+- **New helper functions**:
+  - `is_local_ai_available()` - Check service availability by connection (not process)
+  - `get_available_service_ports()` - Check all 4 Msty services at once
+- **Multi-service model listing** - `list_available_models` now queries ALL services and aggregates results
+- **Shell script launcher** - `run_msty_server.sh` for reliable Claude Desktop integration
+
+### Changed
+- **BREAKING**: Removed dependency on `MstySidecar` process detection
+  - Msty 2.4.0+ has Local AI services built into the main app
+  - Now checks service availability by actually connecting to ports
+- `get_sidecar_status` completely rewritten:
+  - Shows status of all 4 services (Local AI, MLX, LLaMA.cpp, Vibe Proxy)
+  - Returns models from the first available service
+- `list_available_models` now returns models from ALL services with `by_service` breakdown
+- `analyse_msty_health` shows status for all 4 services instead of just Sidecar
+- All functions that checked for `MstySidecar` now use `is_local_ai_available()`
+- Updated environment variables documentation
+
+### Fixed
+- **Critical**: Claude Desktop `cwd` not being respected - added shell script workaround
+- Service detection now works with Msty 2.4.0+ architecture
+- Models from MLX and LLaMA.cpp services are now visible
+
+### Migration Guide
+If upgrading from v4.x:
+1. Replace your Claude Desktop config to use the shell script launcher
+2. Msty Sidecar is no longer required - services are built into Msty Studio 2.4.0+
+3. All existing tools work the same, just with better service detection
+
 ## [4.1.0] - 2025-12-30
 
 ### Added
@@ -105,6 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Phase | Tools |
 |---------|------|-------|-------|
+| 5.0.0 | 2026-01-25 | Msty 2.4.0+ | 24 |
 | 4.1.0 | 2025-12-30 | Enhancement | 24 |
 | 4.0.1 | 2025-12-27 | Bugfix | 24 |
 | 4.0.0 | 2025-12-27 | Phase 5 | 24 |
@@ -112,6 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | 2.0.0 | 2025-12-25 | Phase 2 | 10 |
 | 1.0.0 | 2025-12-24 | Phase 1 | 6 |
 
+[5.0.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v4.1.0...v5.0.0
 [4.1.0]: https://github.com/M-Pineapple/msty-admin-mcp/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/M-Pineapple/msty-admin-mcp/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/M-Pineapple/msty-admin-mcp/compare/v3.0.0...v4.0.0

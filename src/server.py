@@ -86,13 +86,18 @@ mcp = FastMCP("msty-admin")
 # Constants
 # =============================================================================
 
-SERVER_VERSION = "4.1.0"
+SERVER_VERSION = "5.0.0"
 
 # Configurable via environment variables
 SIDECAR_HOST = os.environ.get("MSTY_SIDECAR_HOST", "127.0.0.1")
 SIDECAR_PROXY_PORT = int(os.environ.get("MSTY_PROXY_PORT", 11932))
 LOCAL_AI_SERVICE_PORT = int(os.environ.get("MSTY_AI_PORT", 11964))
 SIDECAR_TIMEOUT = int(os.environ.get("MSTY_TIMEOUT", 10))
+
+# Msty 2.4.0+ ports (services built into main app)
+MLX_SERVICE_PORT = int(os.environ.get("MSTY_MLX_PORT", 11973))
+LLAMACPP_SERVICE_PORT = int(os.environ.get("MSTY_LLAMACPP_PORT", 11454))
+VIBE_PROXY_PORT = int(os.environ.get("MSTY_VIBE_PORT", 8317))
 
 # =============================================================================
 # Data Classes
@@ -201,6 +206,39 @@ def is_process_running(process_name: str) -> bool:
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
     return False
+
+
+def is_local_ai_available(port: int = None, timeout: int = 2) -> bool:
+    """
+    Check if Local AI Service is available by attempting to connect.
+    Works with Msty 2.4.0+ where services are built into main app.
+    """
+    port = port or LOCAL_AI_SERVICE_PORT
+    try:
+        url = f"http://{SIDECAR_HOST}:{port}/v1/models"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.status == 200
+    except:
+        return False
+
+
+def get_available_service_ports() -> dict:
+    """
+    Check which Msty AI services are available (Msty 2.4.0+).
+    Returns dict with service status and ports.
+    """
+    services = {
+        "local_ai": {"port": LOCAL_AI_SERVICE_PORT, "available": False},
+        "mlx": {"port": MLX_SERVICE_PORT, "available": False},
+        "llamacpp": {"port": LLAMACPP_SERVICE_PORT, "available": False},
+        "vibe_proxy": {"port": VIBE_PROXY_PORT, "available": False},
+    }
+
+    for name, info in services.items():
+        services[name]["available"] = is_local_ai_available(info["port"])
+
+    return services
 
 
 # =============================================================================
@@ -383,7 +421,7 @@ def detect_msty_installation() -> str:
         database_path=paths.get("database"),
         mlx_models_path=paths.get("mlx_models"),
         is_running=is_process_running("MstyStudio"),
-        sidecar_running=is_process_running("MstySidecar"),
+        sidecar_running=is_local_ai_available(),  # Msty 2.4.0+ has services built-in
         platform_info=platform_info
     )
     
@@ -565,10 +603,12 @@ def analyse_msty_health() -> str:
         if db_size_mb > 500:
             warnings.append(f"Database is large ({db_size_mb:.0f}MB)")
     
-    health.recommendations.extend([
-        f"Msty Studio: {'Running ✅' if is_process_running('MstyStudio') else 'Not running'}",
-        f"Sidecar: {'Running ✅' if is_process_running('MstySidecar') else 'Not running'}"
-    ])
+    # Check all Msty 2.4.0+ services
+    services = get_available_service_ports()
+    health.recommendations.append(f"Msty Studio: {'Running ✅' if is_process_running('MstyStudio') or is_process_running('Msty') else 'Not running'}")
+    health.recommendations.append(f"Local AI Service (port {LOCAL_AI_SERVICE_PORT}): {'Running ✅' if services['local_ai']['available'] else 'Not running'}")
+    health.recommendations.append(f"MLX Service (port {MLX_SERVICE_PORT}): {'Running ✅' if services['mlx']['available'] else 'Not running'}")
+    health.recommendations.append(f"LLaMA.cpp Service (port {LLAMACPP_SERVICE_PORT}): {'Running ✅' if services['llamacpp']['available'] else 'Not running'}")
     
     health.overall_status = "critical" if issues else ("warning" if warnings else "healthy")
     return json.dumps(asdict(health), indent=2)
@@ -605,7 +645,7 @@ def get_server_status() -> str:
         "msty_status": {
             "installed": paths.get("app") is not None or paths.get("app_alt") is not None,
             "database_available": paths.get("database") is not None,
-            "sidecar_running": is_process_running("MstySidecar")
+            "local_ai_available": is_local_ai_available()  # Msty 2.4.0+ check
         }
     }, indent=2)
 
@@ -825,58 +865,103 @@ def import_tool_config(
 @mcp.tool()
 def get_sidecar_status() -> str:
     """
-    Get comprehensive status of Msty Sidecar and Local AI Service.
-    
+    Get comprehensive status of Msty Local AI Services.
+
     Returns:
-        - Sidecar process status
-        - Local AI Service availability
+        - Msty Studio process status
+        - Local AI Service availability (port 11964)
+        - MLX Service availability (port 11973)
+        - LLaMA.cpp Service availability (port 11454)
+        - Vibe CLI Proxy availability (port 8317)
         - Available models
         - Port information
+
+    Note: Msty 2.4.0+ has services built into the main app, no separate Sidecar needed.
     """
+    # Check all services (Msty 2.4.0+ architecture)
+    services = get_available_service_ports()
+
     result = {
         "timestamp": datetime.now().isoformat(),
-        "sidecar": {"process_running": is_process_running("MstySidecar"), "proxy_port": SIDECAR_PROXY_PORT},
+        "msty_studio": {"process_running": is_process_running("MstyStudio") or is_process_running("Msty")},
+        "services": services,
         "local_ai_service": {"port": LOCAL_AI_SERVICE_PORT, "reachable": False, "models_available": 0},
         "recommendations": []
     }
-    
-    if not result["sidecar"]["process_running"]:
-        result["recommendations"].append("Start Sidecar: open -a MstySidecar")
+
+    # Check if any service is available
+    any_service_available = any(s["available"] for s in services.values())
+
+    if not any_service_available:
+        result["recommendations"].append("Start Msty Studio and enable Local AI services in Settings")
         return json.dumps(result, indent=2)
-    
-    models_response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT, timeout=5)
-    if models_response.get("success"):
-        result["local_ai_service"]["reachable"] = True
-        data = models_response.get("data", {})
-        if isinstance(data, dict) and "data" in data:
-            result["local_ai_service"]["models_available"] = len(data["data"])
-            result["local_ai_service"]["model_list"] = [m.get("id") for m in data["data"]]
-    
+
+    # Try to get models from Local AI Service first, then fallback to other services
+    for service_name, service_info in services.items():
+        if service_info["available"]:
+            models_response = make_api_request("/v1/models", port=service_info["port"], timeout=5)
+            if models_response.get("success"):
+                result["local_ai_service"]["reachable"] = True
+                result["local_ai_service"]["port"] = service_info["port"]
+                result["local_ai_service"]["service"] = service_name
+                data = models_response.get("data", {})
+                if isinstance(data, dict) and "data" in data:
+                    result["local_ai_service"]["models_available"] = len(data["data"])
+                    result["local_ai_service"]["model_list"] = [m.get("id") for m in data["data"]]
+                break
+
     return json.dumps(result, indent=2)
 
 
 @mcp.tool()
 def list_available_models() -> str:
     """
-    List all AI models available through Sidecar's Local AI Service.
-    
+    List all AI models available through Msty's Local AI Services.
+
+    Checks all available services (Local AI, MLX, LLaMA.cpp, Vibe Proxy)
+    and returns models from the first available service.
+
     Returns detailed information about each model.
     """
     result = {"timestamp": datetime.now().isoformat(), "models": [], "model_count": 0}
-    
-    if not is_process_running("MstySidecar"):
-        result["error"] = "Sidecar is not running"
+
+    # Check all services
+    services = get_available_service_ports()
+    any_service_available = any(s["available"] for s in services.values())
+
+    if not any_service_available:
+        result["error"] = "No Local AI services are running. Start Msty Studio and enable services in Settings."
         return json.dumps(result, indent=2)
-    
-    response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT)
-    if response.get("success"):
-        data = response.get("data", {})
-        if isinstance(data, dict) and "data" in data:
-            result["models"] = data["data"]
-            result["model_count"] = len(data["data"])
-    else:
-        result["error"] = response.get("error")
-    
+
+    # Collect models from ALL available services
+    all_models = []
+    services_with_models = {}
+
+    for service_name, service_info in services.items():
+        if service_info["available"]:
+            response = make_api_request("/v1/models", port=service_info["port"])
+            if response.get("success"):
+                data = response.get("data", {})
+                if isinstance(data, dict) and "data" in data:
+                    service_models = data["data"]
+                    # Tag each model with its service
+                    for model in service_models:
+                        model["_service"] = service_name
+                        model["_port"] = service_info["port"]
+                    all_models.extend(service_models)
+                    services_with_models[service_name] = {
+                        "port": service_info["port"],
+                        "model_count": len(service_models),
+                        "models": [m.get("id") for m in service_models]
+                    }
+
+    result["models"] = all_models
+    result["model_count"] = len(all_models)
+    result["by_service"] = services_with_models
+
+    if not all_models:
+        result["error"] = "No models found on any service"
+
     return json.dumps(result, indent=2)
 
 
@@ -897,9 +982,9 @@ def query_local_ai_service(
     Returns:
         Raw API response with status information
     """
-    if not is_process_running("MstySidecar"):
-        return json.dumps({"error": "Sidecar is not running"})
-    
+    if not is_local_ai_available():
+        return json.dumps({"error": "No Local AI service is running. Start Msty Studio and enable services."})
+
     data = json.loads(request_body) if request_body else None
     response = make_api_request(endpoint, port=LOCAL_AI_SERVICE_PORT, method=method, data=data, timeout=30)
     
@@ -931,10 +1016,10 @@ def chat_with_local_model(
     """
     result = {"timestamp": datetime.now().isoformat(), "request": {"message": message[:100] + "..." if len(message) > 100 else message}}
     
-    if not is_process_running("MstySidecar"):
-        result["error"] = "Sidecar is not running"
+    if not is_local_ai_available():
+        result["error"] = "No Local AI service is running. Start Msty Studio and enable services."
         return json.dumps(result, indent=2)
-    
+
     if not model:
         models_response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT)
         if models_response.get("success"):
@@ -1136,10 +1221,10 @@ def compare_model_responses(
     """
     result = {"timestamp": datetime.now().isoformat(), "prompt": prompt[:200] + "...", "responses": [], "comparison": {}}
     
-    if not is_process_running("MstySidecar"):
-        result["error"] = "Sidecar is not running"
+    if not is_local_ai_available():
+        result["error"] = "No Local AI service is running. Start Msty Studio and enable services."
         return json.dumps(result, indent=2)
-    
+
     if not models:
         response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT)
         if response.get("success"):
@@ -1149,7 +1234,7 @@ def compare_model_responses(
         if not models:
             result["error"] = "No models available"
             return json.dumps(result, indent=2)
-    
+
     init_metrics_db()
     
     for model_id in models:
@@ -1319,10 +1404,10 @@ def run_calibration_test(
     """
     result = {"timestamp": datetime.now().isoformat(), "category": category, "tests": [], "summary": {}}
     
-    if not is_process_running("MstySidecar"):
-        result["error"] = "Sidecar is not running"
+    if not is_local_ai_available():
+        result["error"] = "No Local AI service is running. Start Msty Studio and enable services."
         return json.dumps(result, indent=2)
-    
+
     if not model_id:
         response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT)
         if response.get("success"):
