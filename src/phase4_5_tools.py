@@ -486,7 +486,10 @@ def evaluate_response_heuristic(
     if evaluation["criteria_scores"]:
         scores = list(evaluation["criteria_scores"].values())
         evaluation["score"] = round(sum(scores) / len(scores), 2)
-    
+
+    # Add passed field (default threshold 0.6)
+    evaluation["passed"] = evaluation["score"] >= 0.6
+
     return evaluation
 
 

@@ -86,7 +86,7 @@ mcp = FastMCP("msty-admin")
 # Constants
 # =============================================================================
 
-SERVER_VERSION = "5.0.0"
+SERVER_VERSION = "5.0.1"
 
 # Configurable via environment variables
 SIDECAR_HOST = os.environ.get("MSTY_SIDECAR_HOST", "127.0.0.1")
@@ -991,6 +991,56 @@ def query_local_ai_service(
     return json.dumps({"endpoint": endpoint, "method": method, "response": response}, indent=2, default=str)
 
 
+def get_chat_port_for_model(model_id: str) -> int:
+    """
+    Determine which port to use for a given model.
+    Checks all services to find where the model is available.
+    """
+    services = get_available_service_ports()
+
+    for service_name, service_info in services.items():
+        if service_info["available"]:
+            response = make_api_request("/v1/models", port=service_info["port"], timeout=5)
+            if response.get("success"):
+                data = response.get("data", {})
+                if isinstance(data, dict) and "data" in data:
+                    model_ids = [m.get("id") for m in data["data"]]
+                    if model_id in model_ids:
+                        return service_info["port"]
+
+    # Default to MLX port if available, then LLaMA.cpp, then local_ai
+    if services["mlx"]["available"]:
+        return MLX_SERVICE_PORT
+    if services["llamacpp"]["available"]:
+        return LLAMACPP_SERVICE_PORT
+    return LOCAL_AI_SERVICE_PORT
+
+
+def get_first_chat_model() -> tuple:
+    """
+    Find the first available chat model (not embedding model).
+    Returns (model_id, port) or (None, None) if none found.
+    """
+    services = get_available_service_ports()
+
+    # Prefer MLX and LLaMA.cpp services for chat models
+    for service_name in ["mlx", "llamacpp", "vibe_proxy", "local_ai"]:
+        service_info = services.get(service_name, {})
+        if service_info.get("available"):
+            response = make_api_request("/v1/models", port=service_info["port"], timeout=5)
+            if response.get("success"):
+                data = response.get("data", {})
+                if isinstance(data, dict) and "data" in data:
+                    for model in data["data"]:
+                        model_id = model.get("id", "")
+                        # Skip embedding models
+                        if "embed" in model_id.lower() or "bge" in model_id.lower() or "nomic" in model_id.lower():
+                            continue
+                        return (model_id, service_info["port"])
+
+    return (None, None)
+
+
 @mcp.tool()
 def chat_with_local_model(
     message: str,
@@ -1002,45 +1052,49 @@ def chat_with_local_model(
 ) -> str:
     """
     Send a chat message to a local model via Sidecar.
-    
+
     Args:
         message: The user message to send
-        model: Model ID to use (if None, uses first available)
+        model: Model ID to use (if None, uses first available chat model)
         system_prompt: Optional system prompt for context
         temperature: Sampling temperature (0.0-1.0)
         max_tokens: Maximum tokens in response
         track_metrics: Record performance metrics (default: True)
-    
+
     Returns:
         Model response with timing and token information
     """
     result = {"timestamp": datetime.now().isoformat(), "request": {"message": message[:100] + "..." if len(message) > 100 else message}}
-    
-    if not is_local_ai_available():
+
+    # Check if any service is available
+    services = get_available_service_ports()
+    any_available = any(s["available"] for s in services.values())
+
+    if not any_available:
         result["error"] = "No Local AI service is running. Start Msty Studio and enable services."
         return json.dumps(result, indent=2)
 
-    if not model:
-        models_response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT)
-        if models_response.get("success"):
-            data = models_response.get("data", {})
-            if isinstance(data, dict) and "data" in data and data["data"]:
-                model = data["data"][0].get("id")
+    # Find model and appropriate port
+    if model:
+        port = get_chat_port_for_model(model)
+    else:
+        model, port = get_first_chat_model()
         if not model:
-            result["error"] = "No models available"
+            result["error"] = "No chat models available (only embedding models found)"
             return json.dumps(result, indent=2)
-    
+
     result["request"]["model"] = model
-    
+    result["request"]["port"] = port
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": message})
-    
+
     request_data = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens, "stream": False}
-    
+
     start_time = time.time()
-    response = make_api_request("/v1/chat/completions", port=LOCAL_AI_SERVICE_PORT, method="POST", data=request_data, timeout=120)
+    response = make_api_request("/v1/chat/completions", port=port, method="POST", data=request_data, timeout=120)
     elapsed_time = time.time() - start_time
     
     result["timing"] = {"elapsed_seconds": round(elapsed_time, 2)}
@@ -1209,42 +1263,64 @@ def compare_model_responses(
 ) -> str:
     """
     Send the same prompt to multiple models and compare responses.
-    
+
     Args:
         prompt: The prompt to send to all models
-        models: List of model IDs to compare (None = use all available, max 5)
+        models: List of model IDs to compare (None = use all available chat models, max 5)
         system_prompt: Optional system prompt for context
         evaluation_criteria: What to optimise for ("quality", "speed", "balanced")
-    
+
     Returns:
         Comparison of responses with timing and quality scores
     """
     result = {"timestamp": datetime.now().isoformat(), "prompt": prompt[:200] + "...", "responses": [], "comparison": {}}
-    
-    if not is_local_ai_available():
+
+    # Check if any service is available
+    services = get_available_service_ports()
+    any_available = any(s["available"] for s in services.values())
+
+    if not any_available:
         result["error"] = "No Local AI service is running. Start Msty Studio and enable services."
         return json.dumps(result, indent=2)
 
+    # Collect all chat models from all services if not specified
     if not models:
-        response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT)
-        if response.get("success"):
-            data = response.get("data", {})
-            if isinstance(data, dict) and "data" in data:
-                models = [m.get("id") for m in data["data"]][:5]
+        all_models = []
+        for service_name, service_info in services.items():
+            if service_info["available"]:
+                response = make_api_request("/v1/models", port=service_info["port"])
+                if response.get("success"):
+                    data = response.get("data", {})
+                    if isinstance(data, dict) and "data" in data:
+                        for m in data["data"]:
+                            model_id = m.get("id", "")
+                            # Skip embedding models
+                            if "embed" in model_id.lower() or "bge" in model_id.lower() or "nomic" in model_id.lower():
+                                continue
+                            all_models.append({"id": model_id, "port": service_info["port"]})
+        models = all_models[:5]  # Limit to 5 models
         if not models:
-            result["error"] = "No models available"
+            result["error"] = "No chat models available"
             return json.dumps(result, indent=2)
 
     init_metrics_db()
-    
-    for model_id in models:
+
+    for model_entry in models:
+        # Handle both dict format (from auto-discovery) and string format (user-provided)
+        if isinstance(model_entry, dict):
+            model_id = model_entry["id"]
+            port = model_entry["port"]
+        else:
+            model_id = model_entry
+            port = get_chat_port_for_model(model_id)
+
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
-        
+
         start_time = time.time()
-        response = make_api_request("/v1/chat/completions", port=LOCAL_AI_SERVICE_PORT, method="POST",
+        response = make_api_request("/v1/chat/completions", port=port, method="POST",
             data={"model": model_id, "messages": messages, "temperature": 0.7, "max_tokens": 1024, "stream": False}, timeout=120)
         elapsed = time.time() - start_time
         
@@ -1392,34 +1468,38 @@ def run_calibration_test(
 ) -> str:
     """
     Run a calibration test on a local model.
-    
+
     Args:
-        model_id: Model to test (None = auto-select first available)
+        model_id: Model to test (None = auto-select first available chat model)
         category: Test category ("general", "reasoning", "coding", "writing", "analysis", "creative")
         custom_prompt: Use a custom prompt instead of built-in tests
         passing_threshold: Minimum score to pass (0.0-1.0, default 0.6)
-    
+
     Returns:
         Test results with quality scores and recommendations
     """
     result = {"timestamp": datetime.now().isoformat(), "category": category, "tests": [], "summary": {}}
-    
-    if not is_local_ai_available():
+
+    # Check if any service is available
+    services = get_available_service_ports()
+    any_available = any(s["available"] for s in services.values())
+
+    if not any_available:
         result["error"] = "No Local AI service is running. Start Msty Studio and enable services."
         return json.dumps(result, indent=2)
 
-    if not model_id:
-        response = make_api_request("/v1/models", port=LOCAL_AI_SERVICE_PORT)
-        if response.get("success"):
-            data = response.get("data", {})
-            if isinstance(data, dict) and "data" in data and data["data"]:
-                model_id = data["data"][0].get("id")
+    # Find model and port
+    if model_id:
+        port = get_chat_port_for_model(model_id)
+    else:
+        model_id, port = get_first_chat_model()
         if not model_id:
-            result["error"] = "No models available"
+            result["error"] = "No chat models available (only embedding models found)"
             return json.dumps(result, indent=2)
-    
+
     result["model_id"] = model_id
-    
+    result["port"] = port
+
     prompts_to_test = []
     if custom_prompt:
         prompts_to_test = [(category, custom_prompt)]
@@ -1433,16 +1513,16 @@ def run_calibration_test(
     else:
         result["error"] = f"Unknown category: {category}"
         return json.dumps(result, indent=2)
-    
+
     init_metrics_db()
     passed_count, total_score = 0, 0.0
-    
+
     for test_cat, prompt in prompts_to_test:
         import hashlib
         test_id = hashlib.md5(f"{model_id}:{prompt}:{datetime.now().isoformat()}".encode()).hexdigest()[:12]
-        
+
         start_time = time.time()
-        response = make_api_request("/v1/chat/completions", port=LOCAL_AI_SERVICE_PORT, method="POST",
+        response = make_api_request("/v1/chat/completions", port=port, method="POST",
             data={"model": model_id, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 1024, "stream": False}, timeout=120)
         elapsed = time.time() - start_time
         

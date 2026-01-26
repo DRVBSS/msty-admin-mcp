@@ -5,6 +5,19 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.1] - 2026-01-26
+
+### Fixed
+- **Critical**: Chat functions now route to correct service ports
+  - `chat_with_local_model` now finds chat models on MLX/LLaMA.cpp ports instead of using embedding models on port 11964
+  - `compare_model_responses` now compares chat models from all services
+  - `run_calibration_test` now tests chat models instead of embedding models
+- **New helper functions**:
+  - `get_chat_port_for_model()` - Find which port a specific model is on
+  - `get_first_chat_model()` - Find first available chat model (skips embedding models)
+- `evaluate_response_heuristic` now returns `passed` field (fixes `evaluate_response_quality` KeyError)
+- Embedding models (bge-m3, nomic-embed) are now filtered out when auto-selecting models for chat
+
 ## [5.0.0] - 2026-01-25
 
 ### Added
@@ -141,6 +154,7 @@ If upgrading from v4.x:
 
 | Version | Date | Phase | Tools |
 |---------|------|-------|-------|
+| 5.0.1 | 2026-01-26 | Bugfix | 24 |
 | 5.0.0 | 2026-01-25 | Msty 2.4.0+ | 24 |
 | 4.1.0 | 2025-12-30 | Enhancement | 24 |
 | 4.0.1 | 2025-12-27 | Bugfix | 24 |
@@ -149,6 +163,7 @@ If upgrading from v4.x:
 | 2.0.0 | 2025-12-25 | Phase 2 | 10 |
 | 1.0.0 | 2025-12-24 | Phase 1 | 6 |
 
+[5.0.1]: https://github.com/DRVBSS/msty-admin-mcp/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/DRVBSS/msty-admin-mcp/compare/v4.1.0...v5.0.0
 [4.1.0]: https://github.com/M-Pineapple/msty-admin-mcp/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/M-Pineapple/msty-admin-mcp/compare/v4.0.0...v4.0.1

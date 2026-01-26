@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "msty-admin-mcp"
-version = "5.0.0"
+version = "5.0.1"
 description = "MCP Server for Msty Studio Desktop 2.4.0+ Administration - Full support for Local AI, MLX, LLaMA.cpp, and Vibe Proxy services"
 readme = "README.md"
 license = "MIT"
