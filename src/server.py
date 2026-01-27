@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Msty Admin MCP Server v6.0.0
+Msty Admin MCP Server v7.0.0
 
 AI-administered Msty Studio Desktop management system with database insights,
 configuration management, hardware optimization, and Claude Desktop sync.
@@ -45,7 +45,32 @@ Phase 9: Backup & System Management
 - backup_configuration, restore_configuration
 - get_system_resources
 
-Total: 42 tools
+Phase 10: Knowledge Stack Management
+- ks_list_stacks, ks_get_details, ks_search
+- ks_analyze, ks_statistics
+
+Phase 11: Model Download/Delete
+- model_inventory, model_delete, model_find_duplicates
+- model_check_hf, model_download_guide, model_storage_analysis
+
+Phase 12: Claude ↔ Local Model Bridge
+- bridge_select_model, bridge_delegate, bridge_consensus
+- bridge_draft_refine, bridge_parallel_tasks
+
+Phase 13: Turnstile Workflows
+- turnstile_list, turnstile_details, turnstile_templates
+- turnstile_get_template, turnstile_execute
+- turnstile_analyze, turnstile_suggest
+
+Phase 14: Live Context
+- context_system, context_datetime, context_msty
+- context_full, context_for_prompt
+
+Phase 15: Conversation Analytics
+- analytics_usage, analytics_content, analytics_models
+- analytics_sessions, analytics_report
+
+Total: 77 tools
 
 Created by Pineapple 🍍 AI Administration System
 """
@@ -140,6 +165,9 @@ from .phase4_5_tools import (
     CALIBRATION_PROMPTS,
     QUALITY_RUBRIC
 )
+
+# Import extension tools (Phases 10-15)
+from .server_extensions import register_extension_tools
 
 # Configure logging
 logging.basicConfig(
@@ -3075,7 +3103,17 @@ def main():
     logger.info("Phase 7: Conversation Management")
     logger.info("Phase 8: Prompt Templates & Automation")
     logger.info("Phase 9: Backup & System Management")
-    logger.info("Total tools: 42")
+    logger.info("Phase 10: Knowledge Stack Management")
+    logger.info("Phase 11: Model Download/Delete")
+    logger.info("Phase 12: Claude ↔ Local Model Bridge")
+    logger.info("Phase 13: Turnstile Workflows")
+    logger.info("Phase 14: Live Context")
+    logger.info("Phase 15: Conversation Analytics")
+
+    # Register extension tools
+    register_extension_tools(mcp)
+
+    logger.info("Total tools: 77")
     mcp.run()
 
 

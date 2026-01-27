@@ -4,35 +4,51 @@
 
 An MCP (Model Context Protocol) server that transforms Claude into an intelligent system administrator for [Msty Studio Desktop](https://msty.ai). Query databases, manage configurations, orchestrate local AI models, and build tiered AI workflows—all through natural conversation.
 
-[![Version](https://img.shields.io/badge/version-6.5.0-blue.svg)](https://github.com/DRVBSS/msty-admin-mcp/releases)
+[![Version](https://img.shields.io/badge/version-7.0.0-blue.svg)](https://github.com/DRVBSS/msty-admin-mcp/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-yellow.svg)](https://python.org)
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://apple.com)
 [![Msty](https://img.shields.io/badge/Msty-2.4.0+-purple.svg)](https://msty.ai)
-[![Tests](https://img.shields.io/badge/tests-109%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-92%20passing-brightgreen.svg)](tests/)
+[![Tools](https://img.shields.io/badge/tools-77-orange.svg)](src/)
 
-> **v6.5.0** - Complete modular architecture with 42 tools, comprehensive testing, and full Msty 2.4.0+ support.
+> **v7.0.0** - Massive expansion with 77 tools including Knowledge Stacks, Model Management, Claude↔Local Bridge, Turnstile Workflows, Live Context, and Conversation Analytics.
 
 ---
 
-## What's New in v6.5.0
+## What's New in v7.0.0
 
-### Modular Architecture
-The codebase has been refactored into dedicated utility modules for better maintainability and testability:
+### 35 New Tools Across 6 New Phases
+
+| Phase | Tools | Description |
+|-------|-------|-------------|
+| **Phase 10: Knowledge Stacks** | 5 | RAG system management - list, search, analyze |
+| **Phase 11: Model Management** | 6 | Download/delete models, find duplicates, storage analysis |
+| **Phase 12: Claude↔Local Bridge** | 5 | Intelligent model delegation, multi-model consensus |
+| **Phase 13: Turnstile Workflows** | 7 | 5 built-in automation templates, dry-run execution |
+| **Phase 14: Live Context** | 5 | Real-time system/datetime/Msty context for prompts |
+| **Phase 15: Conversation Analytics** | 5 | Usage patterns, content analysis, session metrics |
+
+### New Modules
 
 | Module | Purpose |
 |--------|---------|
-| `constants.py` | Server config, ports, table allowlists |
-| `models.py` | Data classes (MstyInstallation, etc.) |
-| `errors.py` | Standardized error responses |
-| `paths.py` | macOS path resolution |
-| `database.py` | SQL operations with injection protection |
-| `network.py` | API requests, process detection |
-| `cache.py` | Response caching with TTL |
-| `tagging.py` | Smart model categorization (60+ overrides) |
+| `knowledge_stacks.py` | Knowledge Stack management for RAG |
+| `model_management.py` | Model download/delete operations |
+| `model_bridge.py` | Claude↔Local Model orchestration |
+| `turnstiles.py` | Turnstile workflow automation |
+| `live_context.py` | Real-time context providers |
+| `conversation_analytics.py` | Advanced analytics |
+| `server_extensions.py` | Extension tool registration |
+
+### Enhanced Tagging System v2.0
+- Context length awareness: `long_context` (100K+), `very_long_context` (250K+), `massive_context` (500K+)
+- Quantization detection: `fp16`, `8bit`, `6bit`, `5bit`, `4bit`, `3bit`
+- Architecture tags: `moe`, `mlx`, `gguf`
+- New size tier: `massive` (200B+ parameters)
 
 ### Comprehensive Testing
-- **109 unit tests** covering all utility modules
+- **92 unit tests** covering all modules
 - SQL injection protection verified
 - Error handling tested
 - Cache behavior validated

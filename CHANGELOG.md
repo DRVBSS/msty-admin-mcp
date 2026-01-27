@@ -5,6 +5,69 @@ All notable changes to Msty Admin MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2026-01-27
+
+### Added
+- **Phase 10: Knowledge Stack Management** - RAG system management tools
+  - `ks_list_stacks` - List all Knowledge Stacks with metadata
+  - `ks_get_details` - Get detailed stack information
+  - `ks_search` - Search within a Knowledge Stack
+  - `ks_analyze` - Analyze stack quality with recommendations
+  - `ks_statistics` - Aggregate statistics across all stacks
+
+- **Phase 11: Model Download/Delete** - Local model management
+  - `model_inventory` - Complete inventory of local models (MLX, GGUF, Ollama)
+  - `model_delete` - Safe model deletion with confirmation
+  - `model_find_duplicates` - Identify duplicate models for cleanup
+  - `model_check_hf` - Check HuggingFace model availability
+  - `model_download_guide` - Step-by-step download instructions
+  - `model_storage_analysis` - Storage analysis with cleanup recommendations
+
+- **Phase 12: Claude ↔ Local Model Bridge** - AI orchestration
+  - `bridge_select_model` - Intelligent model selection by task type
+  - `bridge_delegate` - Delegate tasks to local models
+  - `bridge_consensus` - Multi-model consensus with voting
+  - `bridge_draft_refine` - Draft with local model, refine with Claude
+  - `bridge_parallel_tasks` - Parallel task processing across models
+
+- **Phase 13: Turnstile Workflows** - Automation pipelines
+  - `turnstile_list` - List existing turnstile workflows
+  - `turnstile_details` - Get turnstile configuration
+  - `turnstile_templates` - 5 built-in templates (code_review, research_synthesis, content_creation, data_analysis, translation_pipeline)
+  - `turnstile_get_template` - Get specific template config
+  - `turnstile_execute` - Execute/preview workflows (dry_run mode)
+  - `turnstile_analyze` - Usage pattern analysis
+  - `turnstile_suggest` - Task-based template suggestions
+
+- **Phase 14: Live Context** - Real-time system context
+  - `context_system` - CPU, memory, disk information
+  - `context_datetime` - Detailed datetime with timezone
+  - `context_msty` - Msty-specific status and paths
+  - `context_full` - Aggregated context from all providers
+  - `context_for_prompt` - Context formatted for AI prompts (markdown/text/json)
+  - Context caching with configurable TTL
+
+- **Phase 15: Conversation Analytics** - Advanced analytics
+  - `analytics_usage` - Usage patterns with insights
+  - `analytics_content` - Privacy-preserving content analysis
+  - `analytics_models` - Model performance metrics
+  - `analytics_sessions` - Session duration and patterns
+  - `analytics_report` - Comprehensive analytics report with executive summary
+
+### Changed
+- Total tools increased from 42 to 77 (+35 new tools)
+- New modular extension system (`server_extensions.py`)
+- Server version bumped to 7.0.0
+
+### New Modules
+- `src/knowledge_stacks.py` - Knowledge Stack management
+- `src/model_management.py` - Model download/delete operations
+- `src/model_bridge.py` - Claude ↔ Local Model orchestration
+- `src/turnstiles.py` - Turnstile workflow automation
+- `src/live_context.py` - Real-time context providers
+- `src/conversation_analytics.py` - Conversation analytics
+- `src/server_extensions.py` - Extension tool registration
+
 ## [6.6.0] - 2026-01-26
 
 ### Added
